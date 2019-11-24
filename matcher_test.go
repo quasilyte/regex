@@ -59,7 +59,7 @@ func BenchmarkMatcher(b *testing.B) {
 		re := regexp.MustCompile(test.expr)
 		m, err := CompileMatcher(test.expr)
 		if err != nil {
-			b.Fatalf("compile(%s): %v", test.expr, err)
+			b.Fatalf("compile(`%s`): %v", test.expr, err)
 		}
 
 		runBench := func(kind, input string, want bool) {
@@ -77,17 +77,49 @@ func BenchmarkMatcher(b *testing.B) {
 }
 
 func TestSuffixLitMatcher(t *testing.T) {
-	expressions := []string{
-		`[A-Z]+_SUSPEND`,
+	tests := []struct {
+		expr    string
+		match   []string
+		nomatch []string
+	}{
+		{
+			expr: `[A-Z]+_SUSPEND`,
+			match: []string{
+				`A_SUSPEND`,
+				` FOO_SUSPEND`,
+				`FOO_SUSPEND `,
+				` A_SUSPENDED `,
+			},
+			nomatch: []string{
+				`_SUSPEND`,
+				` _SUSPEND`,
+				`_SUSPEND `,
+				` _SUSPEND`,
+				`a_SUSPEND`,
+				`linux_suspend`,
+				`A _SUSPEND`,
+			},
+		},
 	}
 
-	for _, expr := range expressions {
-		m, err := CompileMatcher(expr)
+	for _, test := range tests {
+		m, err := CompileMatcher(test.expr)
 		if err != nil {
-			t.Fatalf("compile(%s): %v", expr, err)
+			t.Fatalf("compile(`%s`): %v", test.expr, err)
 		}
 		if _, ok := m.(*suffixLitMatcher); !ok {
-			t.Errorf("compile(%s): expected *suffixLitMatcher, got %T", expr, m)
+			t.Errorf("compile(`%s`): expected *suffixLitMatcher, got %T", test.expr, m)
+			continue
+		}
+		for _, s := range test.match {
+			if !m.MatchString(s) {
+				t.Errorf("match(`%s`): not matched", s)
+			}
+		}
+		for _, s := range test.nomatch {
+			if m.MatchString(s) {
+				t.Errorf("match(`%s`): matched", s)
+			}
 		}
 	}
 }

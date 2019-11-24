@@ -25,11 +25,11 @@ func TestReversedPattern(t *testing.T) {
 	for _, test := range tests {
 		re, err := syntax.Parse(test.expr, syntax.Perl)
 		if err != nil {
-			t.Fatalf("parse(%s): %v", test.expr, err)
+			t.Fatalf("parse(`%s`): %v", test.expr, err)
 		}
 		have := reversedPattern(re)
 		if have != test.want {
-			t.Errorf("results mismatch for %s:\nhave: %s\nwant: %s",
+			t.Errorf("results mismatch for `%s`:\nhave: `%s`\nwant: `%s`",
 				test.expr, have, test.want)
 		}
 	}
