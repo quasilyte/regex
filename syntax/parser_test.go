@@ -53,7 +53,7 @@ func TestParser(t *testing.T) {
 		{` `, ` `},
 		{`  `, `{   }`},
 		{`x`, `x`},
-		{`abc`, `{{a b} c}`},
+		{`abc`, `{a b c}`},
 		{`□`, `□`},
 		{`✓`, `✓`},
 		{`✓✓`, `{✓ ✓}`},
@@ -61,14 +61,14 @@ func TestParser(t *testing.T) {
 		// Dots and alternations (or).
 		{`.`, `.`},
 		{`..`, `{. .}`},
-		{`...`, `{{. .} .}`},
+		{`...`, `{. . .}`},
 		{`.|.`, `(or . .)`},
 		{`.|✓|.`, `(or (or . ✓) .)`},
 		{`✓.|.`, `(or {✓ .} .)`},
 		{`.|✓.`, `(or . {✓ .})`},
-		{`..✓|.`, `(or {{. .} ✓} .)`},
-		{`.|..|..✓`, `(or (or . {. .}) {{. .} ✓})`},
-		{`.|...|..`, `(or (or . {{. .} .}) {. .})`},
+		{`..✓|.`, `(or {. . ✓} .)`},
+		{`.|..|..✓`, `(or (or . {. .}) {. . ✓})`},
+		{`.|...|..`, `(or (or . {. . .}) {. .})`},
 
 		// Capturing groups.
 		{`()`, `(capture {})`},
@@ -76,28 +76,28 @@ func TestParser(t *testing.T) {
 		{`(.✓)`, `(capture {. ✓})`},
 		{`(x)|(y)`, `(or (capture x) (capture y))`},
 		{`(x)(y)`, `{(capture x) (capture y)}`},
-		{`✓(x)y`, `{{✓ (capture x)} y}`},
-		{`a(x1|y1)b`, `{{a (capture (or {x 1} {y 1}))} b}`},
+		{`✓(x)y`, `{✓ (capture x) y}`},
+		{`a(x1|y1)b`, `{a (capture (or {x 1} {y 1})) b}`},
 
 		// Non-capturing groups without flags.
-		{`x(?:)y`, `{{x (group {})} y}`},
-		{`x(?:.)y`, `{{x (group .)} y}`},
-		{`x(?:ab)y`, `{{x (group {a b})} y}`},
+		{`x(?:)y`, `{x (group {}) y}`},
+		{`x(?:.)y`, `{x (group .) y}`},
+		{`x(?:ab)y`, `{x (group {a b}) y}`},
 
 		// Flag-only groups.
-		{`x(?i)y`, `{{x (flags ?i)} y}`},
-		{`x(?i-m)y`, `{{x (flags ?i-m)} y}`},
-		{`x(?-im)y`, `{{x (flags ?-im)} y}`},
+		{`x(?i)y`, `{x (flags ?i) y}`},
+		{`x(?i-m)y`, `{x (flags ?i-m) y}`},
+		{`x(?-im)y`, `{x (flags ?-im) y}`},
 
 		// Non-capturing groups with flags.
-		{`x(?i:)y`, `{{x (group {} ?i)} y}`},
-		{`x(?im:.)y`, `{{x (group . ?im)} y}`},
-		{`x(?i-m:ab)y`, `{{x (group {a b} ?i-m)} y}`},
+		{`x(?i:)y`, `{x (group {} ?i) y}`},
+		{`x(?im:.)y`, `{x (group . ?im) y}`},
+		{`x(?i-m:ab)y`, `{x (group {a b} ?i-m) y}`},
 
 		// Named captures.
-		{`x(?P<g>)y`, `{{x (capture {} g)} y}`},
-		{`x(?P<name>.)y`, `{{x (capture . name)} y}`},
-		{`x(?P<1>ab)y`, `{{x (capture {a b} 1)} y}`},
+		{`x(?P<g>)y`, `{x (capture {} g) y}`},
+		{`x(?P<name>.)y`, `{x (capture . name) y}`},
+		{`x(?P<1>ab)y`, `{x (capture {a b} 1) y}`},
 
 		// Quantifiers.
 		{`x+`, `(+ x)`},
@@ -106,8 +106,8 @@ func TestParser(t *testing.T) {
 		{`x+y+|z+`, `(or {(+ x) (+ y)} (+ z))`},
 		{`(ab)+`, `(+ (capture {a b}))`},
 		{`(.b)+`, `(+ (capture {. b}))`},
-		{`x+y*z+`, `{{(+ x) (* y)} (+ z)}`},
-		{`abc+`, `{{a b} (+ c)}`},
+		{`x+y*z+`, `{(+ x) (* y) (+ z)}`},
+		{`abc+`, `{a b (+ c)}`},
 
 		// Non-greedy modifiers.
 		{`x+?|y+?`, `(or (non-greedy (+ x)) (non-greedy (+ y)))`},
@@ -183,11 +183,11 @@ func TestParser(t *testing.T) {
 		{`[^$.+*^?]`, `[^$ . + * ^ ?]`},
 
 		// Posix char classes.
-		{`x[:alpha:]y`, `{{x [: a l p h a :]} y}`},
-		{`x[a[:alpha:]]y`, `{{x [a [:alpha:]]} y}`},
-		{`x[[:^alpha:]]y`, `{{x [[:^alpha:]]} y}`},
-		{`x[^[:alpha:]]y`, `{{x [^[:alpha:]]} y}`},
-		{`x[^[:^alpha:]]y`, `{{x [^[:^alpha:]]} y}`},
+		{`x[:alpha:]y`, `{x [: a l p h a :] y}`},
+		{`x[a[:alpha:]]y`, `{x [a [:alpha:]] y}`},
+		{`x[[:^alpha:]]y`, `{x [[:^alpha:]] y}`},
+		{`x[^[:alpha:]]y`, `{x [^[:alpha:]] y}`},
+		{`x[^[:^alpha:]]y`, `{x [^[:^alpha:]] y}`},
 
 		// Valid repeat expressions.
 		{`.{3}`, `(repeat . {3})`},
@@ -197,32 +197,31 @@ func TestParser(t *testing.T) {
 		{`[a-z]{5}`, `(repeat [a-z] {5})`},
 
 		// Invalid repeat expressions are parsed as normal chars.
-		{`.{a}`, `{{{. {} a} }}`},
-		{`.{-1}`, `{{{{. {} -} 1} }}`},
+		{`.{a}`, `{. '{' a '}'}`},
+		{`.{-1}`, `{. '{' - 1 '}'}`},
 
 		// \Q...\E escape.
 		{`\Qa.b\E+z`, `{(+ (q \Qa.b\E)) z}`},
-		{`x\Q?\Ey`, `{{x (q \Q?\E)} y}`},
-		{`x\Q\Ey`, `{{x (q \Q\E)} y}`},
+		{`x\Q?\Ey`, `{x (q \Q?\E) y}`},
+		{`x\Q\Ey`, `{x (q \Q\E) y}`},
 		{`x\Q`, `{x (q \Q)}`},
 		{`x\Qy`, `{x (q \Qy)}`},
 		{`x\Qyz`, `{x (q \Qyz)}`},
 
 		// Tests from the patterns found in various GitHub projects.
-		{`Adm([^i]|$)`, `{{{A d} m} (capture (or [^i] $))}`},
-		{`\.(com|com\.\w{2})$`, `{{\. (capture (or {{c o} m} {{{{c o} m} \.} (repeat \w {2})}))} $}`},
+		{`Adm([^i]|$)`, `{A d m (capture (or [^i] $))}`},
+		{`\.(com|com\.\w{2})$`, `{\. (capture (or {c o m} {c o m \. (repeat \w {2})})) $}`},
 	}
 
 	p := NewParser()
 	for _, test := range tests {
 		re, err := p.Parse(test.pattern)
 		if err != nil {
-			t.Errorf("parse(%q) error: %v", test.pattern, err)
-			continue
+			t.Fatalf("parse(%q) error: %v", test.pattern, err)
 		}
 		have := FormatSyntax(re)
 		if have != test.want {
-			t.Errorf("parse(%q):\nhave: %s\nwant: %s",
+			t.Fatalf("parse(%q):\nhave: %s\nwant: %s",
 				test.pattern, have, test.want)
 		}
 	}

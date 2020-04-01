@@ -32,7 +32,17 @@ func FormatSyntax(re *Regexp) string {
 
 func formatExprSyntax(re *Regexp, e Expr) string {
 	switch e.Op {
-	case OpLiteral, OpEscape, OpEscapeMeta, OpEscapeOctal, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpPosixClass:
+	case OpLiteral:
+		s := re.ExprString(e)
+		switch s {
+		case "{":
+			return "'{'"
+		case "}":
+			return "'}'"
+		default:
+			return s
+		}
+	case OpEscape, OpEscapeMeta, OpEscapeOctal, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpPosixClass:
 		return re.ExprString(e)
 	case OpRepeat:
 		return fmt.Sprintf("(repeat %s %s)", formatExprSyntax(re, e.Args[0]), re.ExprString(e.Args[1]))

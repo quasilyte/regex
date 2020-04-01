@@ -44,6 +44,11 @@ func NewParser() *Parser {
 		return p.newExpr(OpAlt, tok.pos, left, right)
 	}
 	p.infixParselets[tokConcat] = func(left *Expr, tok token) *Expr {
+		if left.Op == OpConcat {
+			right := p.parseExpr(2)
+			left.Args = append(left.Args, *right)
+			return left
+		}
 		right := p.parseExpr(2)
 		return p.newExpr(OpConcat, tok.pos, left, right)
 	}
