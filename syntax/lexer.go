@@ -26,7 +26,7 @@ const (
 	tokConcat
 	tokRepeat
 	tokEscape
-	tokEscapeChar
+	tokEscapeMeta
 	tokEscapeOctal
 	tokEscapeUni
 	tokEscapeUniFull
@@ -57,8 +57,11 @@ var reMetachar = [256]bool{
 	'|':  true,
 	'*':  true,
 	'+':  true,
+	'?':  true,
 	'.':  true,
 	'[':  true,
+	']':  true,
+	'^':  true,
 	'$':  true,
 	'(':  true,
 	')':  true,
@@ -66,7 +69,6 @@ var reMetachar = [256]bool{
 
 // charClassMetachar is a table of meta chars inside char class.
 var charClassMetachar = [256]bool{
-	']': true,
 	'-': true,
 
 	// ...plus all chars from the reMetachar.
@@ -74,8 +76,11 @@ var charClassMetachar = [256]bool{
 	'|':  true,
 	'*':  true,
 	'+':  true,
+	'?':  true,
 	'.':  true,
 	'[':  true,
+	']':  true,
+	'^':  true,
 	'$':  true,
 	'(':  true,
 	')':  true,
@@ -271,11 +276,11 @@ func (l *lexer) Init(s string) error {
 				kind := tokEscape
 				if insideCharClass {
 					if charClassMetachar[l.byteAt(i+1)] {
-						kind = tokEscapeChar
+						kind = tokEscapeMeta
 					}
 				} else {
 					if reMetachar[l.byteAt(i+1)] {
-						kind = tokEscapeChar
+						kind = tokEscapeMeta
 					}
 				}
 				pushTok(kind)

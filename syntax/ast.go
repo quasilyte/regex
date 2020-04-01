@@ -26,18 +26,13 @@ func (e Expr) End() uint16 { return e.Pos.End }
 
 type Operation byte
 
-type Position struct {
-	Begin uint16
-	End   uint16
-}
-
 func FormatSyntax(re *Regexp) string {
 	return formatExprSyntax(re, re.Expr)
 }
 
 func formatExprSyntax(re *Regexp, e Expr) string {
 	switch e.Op {
-	case OpLiteral, OpEscape, OpEscapeChar, OpEscapeOctal, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpPosixClass:
+	case OpLiteral, OpEscape, OpEscapeMeta, OpEscapeOctal, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpPosixClass:
 		return re.ExprString(e)
 	case OpRepeat:
 		return fmt.Sprintf("(repeat %s %s)", formatExprSyntax(re, e.Args[0]), re.ExprString(e.Args[1]))
@@ -90,6 +85,7 @@ func formatArgsSyntax(re *Regexp, args []Expr) string {
 	return strings.Join(parts, " ")
 }
 
+//go:generate stringer -type=Operation -trimprefix=Op
 const (
 	OpNone Operation = iota
 
@@ -110,9 +106,9 @@ const (
 	// Examples: `\d` `\a` `\n`
 	OpEscape
 
-	// OpEscapeChar is an escaped meta char.
+	// OpEscapeMeta is an escaped meta char.
 	// Examples: `\(` `\[` `\+`
-	OpEscapeChar
+	OpEscapeMeta
 
 	// OpEscapeOctal is an octal char code escape (up to 3 digits).
 	// Examples: `\123` `\12`

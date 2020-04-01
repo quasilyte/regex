@@ -16,10 +16,6 @@ func NewParser() *Parser {
 		}
 	}
 
-	combinePos := func(begin, end Position) Position {
-		return Position{Begin: begin.Begin, End: end.End}
-	}
-
 	// TODO: can we handle group parsing in a more elegant way?
 
 	p.prefixParselets[tokLparen] = p.parseCapture
@@ -150,32 +146,34 @@ func (p *Parser) parsePrefixElementary(tok token) *Expr {
 func (p *Parser) parseCharClass(op Operation, tok token) *Expr {
 	if p.lexer.Peek().kind == tokRbracket {
 		// An empty char class `[]` or `[^]`. Not valid, but we take it.
-		p.lexer.NextToken()
-		return p.newExpr(op, tok.pos)
+		tok2 := p.lexer.NextToken()
+		return p.newExpr(op, combinePos(tok.pos, tok2.pos))
 	}
 
+	var endPos Position
 	p.charClass = p.charClass[:0]
 	for {
 		p.charClass = append(p.charClass, *p.parseExpr(0))
-		next := p.lexer.Peek().kind
-		if next == tokRbracket {
+		next := p.lexer.Peek()
+		if next.kind == tokRbracket {
+			endPos = next.pos
 			p.lexer.NextToken()
 			break
 		}
-		if next == tokNone {
+		if next.kind == tokNone {
 			throwfPos(tok.pos, "unterminated '['")
 		}
 	}
 
-	result := p.newExpr(op, tok.pos)
+	result := p.newExpr(op, combinePos(tok.pos, endPos))
 	result.Args = append(result.Args, p.charClass...)
 	return result
 }
 
 func (p *Parser) parseMinus(left *Expr, tok token) *Expr {
 	switch left.Op {
-	case OpEscapeChar, OpLiteral:
-		if next := p.lexer.Peek().kind; next == tokChar || next == tokEscapeChar || next == tokMinus {
+	case OpEscapeMeta, OpLiteral:
+		if next := p.lexer.Peek().kind; next == tokChar || next == tokEscapeMeta || next == tokMinus {
 			right := p.parseExpr(2)
 			return p.newExpr(OpCharRange, tok.pos, left, right)
 		}
@@ -227,7 +225,8 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 			Begin: tok.pos.Begin + uint16(len("(")),
 			End:   tok.pos.End,
 		})
-		result = p.newExpr(OpFlagOnlyGroup, tok.pos, flags)
+		pos2 := p.lexer.Peek().pos
+		result = p.newExpr(OpFlagOnlyGroup, combinePos(tok.pos, pos2), flags)
 	case val == "?:":
 		x := p.parseGroupItem(tok)
 		result = p.newExpr(OpGroup, tok.pos, x)
@@ -263,7 +262,7 @@ var tok2op = [256]Operation{
 	tokChar:          OpLiteral,
 	tokMinus:         OpLiteral,
 	tokEscape:        OpEscape,
-	tokEscapeChar:    OpEscapeChar,
+	tokEscapeMeta:    OpEscapeMeta,
 	tokEscapeHex:     OpEscapeHex,
 	tokEscapeHexFull: OpEscapeHexFull,
 	tokEscapeOctal:   OpEscapeOctal,

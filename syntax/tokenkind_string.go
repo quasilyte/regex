@@ -15,7 +15,7 @@ func _() {
 	_ = x[tokConcat-4]
 	_ = x[tokRepeat-5]
 	_ = x[tokEscape-6]
-	_ = x[tokEscapeChar-7]
+	_ = x[tokEscapeMeta-7]
 	_ = x[tokEscapeOctal-8]
 	_ = x[tokEscapeUni-9]
 	_ = x[tokEscapeUniFull-10]
@@ -39,7 +39,7 @@ func _() {
 	_ = x[tokRparen-28]
 }
 
-const _tokenKind_name = "NoneCharGroupFlagsPosixClassConcatRepeatEscapeEscapeCharEscapeOctalEscapeUniEscapeUniFullEscapeHexEscapeHexFull\\Q-[[^]$^?.+*|((?P<name>(?flags)"
+const _tokenKind_name = "NoneCharGroupFlagsPosixClassConcatRepeatEscapeEscapeMetaEscapeOctalEscapeUniEscapeUniFullEscapeHexEscapeHexFull\\Q-[[^]$^?.+*|((?P<name>(?flags)"
 
 var _tokenKind_index = [...]uint8{0, 4, 8, 18, 28, 34, 40, 46, 56, 67, 76, 89, 98, 111, 113, 114, 115, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 135, 142, 143}
 
