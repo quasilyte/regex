@@ -56,28 +56,31 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 	}
 
 	switch e.Op {
-	case OpLiteral, OpQuote, OpPosixClass:
+	case OpLiteral, OpQuote, OpPosixClass,
+		OpEscape, OpEscapeMeta, OpEscapeUni, OpEscapeUniFull,
+		OpEscapeHex, OpEscapeHexFull, OpEscapeOctal,
+		OpDot, OpCaret, OpDollar:
 		w.WriteString(re.ExprString(e))
-	case OpEscape, OpEscapeMeta, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpEscapeOctal:
-		w.WriteString(re.ExprString(e))
-	case OpDot, OpCaret, OpDollar:
-		w.WriteString(re.ExprString(e))
+
 	case OpCharRange:
 		assertBeginPos(e, e.Args[0].Begin())
 		assertEndPos(e, e.Args[1].End())
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte('-')
 		writeExpr(t, w, re, e.Args[1])
+
 	case OpNamedCapture:
 		assertEndPos(e, e.Args[0].End()+1)
 		fmt.Fprintf(w, "(?P<%s>", re.ExprString(e.Args[1]))
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
+
 	case OpFlagOnlyGroup:
 		assertEndPos(e, e.Args[0].End()+1)
 		w.WriteByte('(')
 		w.WriteString(re.ExprString(e.Args[0]))
 		w.WriteByte(')')
+
 	case OpGroupWithFlags:
 		assertEndPos(e, e.Args[0].End()+1)
 		w.WriteByte('(')
@@ -85,6 +88,7 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 		w.WriteByte(':')
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
+
 	case OpCapture, OpGroup:
 		assertEndPos(e, e.Args[0].End()+1)
 		w.WriteByte('(')
@@ -93,6 +97,7 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 		}
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
+
 	case OpCharClass, OpNegCharClass:
 		assertEndPos(e, e.LastArg().End()+1)
 		w.WriteByte('[')
@@ -103,11 +108,13 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 			writeExpr(t, w, re, a)
 		}
 		w.WriteByte(']')
+
 	case OpRepeat:
 		assertBeginPos(e, e.Args[0].Begin())
 		assertEndPos(e, e.Args[1].End())
 		writeExpr(t, w, re, e.Args[0])
 		writeExpr(t, w, re, e.Args[1])
+
 	case OpConcat:
 		assertBeginPos(e, e.Begin())
 		if len(e.Args) > 0 {
@@ -116,6 +123,7 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 		for _, a := range e.Args {
 			writeExpr(t, w, re, a)
 		}
+
 	case OpAlt:
 		assertBeginPos(e, e.Begin())
 		assertEndPos(e, e.LastArg().End())
@@ -125,18 +133,18 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 				w.WriteByte('|')
 			}
 		}
-	case OpNonGreedy, OpQuestion:
+
+	case OpNonGreedy, OpQuestion, OpPlus, OpStar:
 		assertEndPos(e, e.Args[0].End()+1)
 		writeExpr(t, w, re, e.Args[0])
-		w.WriteByte('?')
-	case OpPlus:
-		assertEndPos(e, e.Args[0].End()+1)
-		writeExpr(t, w, re, e.Args[0])
-		w.WriteByte('+')
-	case OpStar:
-		assertEndPos(e, e.Args[0].End()+1)
-		writeExpr(t, w, re, e.Args[0])
-		w.WriteByte('*')
+		switch e.Op {
+		case OpNonGreedy, OpQuestion:
+			w.WriteByte('?')
+		case OpPlus:
+			w.WriteByte('+')
+		case OpStar:
+			w.WriteByte('*')
+		}
 
 	default:
 		panic(fmt.Sprintf("unhandled %s", e.Op))
