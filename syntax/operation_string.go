@@ -19,30 +19,32 @@ func _() {
 	_ = x[OpCaret-8]
 	_ = x[OpDollar-9]
 	_ = x[OpLiteral-10]
-	_ = x[OpQuote-11]
-	_ = x[OpEscape-12]
-	_ = x[OpEscapeMeta-13]
-	_ = x[OpEscapeOctal-14]
-	_ = x[OpEscapeHex-15]
-	_ = x[OpEscapeHexFull-16]
-	_ = x[OpEscapeUni-17]
-	_ = x[OpEscapeUniFull-18]
-	_ = x[OpCharClass-19]
-	_ = x[OpNegCharClass-20]
-	_ = x[OpCharRange-21]
-	_ = x[OpPosixClass-22]
-	_ = x[OpRepeat-23]
-	_ = x[OpCapture-24]
-	_ = x[OpNamedCapture-25]
-	_ = x[OpGroup-26]
-	_ = x[OpGroupWithFlags-27]
-	_ = x[OpFlagOnlyGroup-28]
-	_ = x[OpNone2-29]
+	_ = x[OpChar-11]
+	_ = x[OpString-12]
+	_ = x[OpQuote-13]
+	_ = x[OpEscape-14]
+	_ = x[OpEscapeMeta-15]
+	_ = x[OpEscapeOctal-16]
+	_ = x[OpEscapeHex-17]
+	_ = x[OpEscapeHexFull-18]
+	_ = x[OpEscapeUni-19]
+	_ = x[OpEscapeUniFull-20]
+	_ = x[OpCharClass-21]
+	_ = x[OpNegCharClass-22]
+	_ = x[OpCharRange-23]
+	_ = x[OpPosixClass-24]
+	_ = x[OpRepeat-25]
+	_ = x[OpCapture-26]
+	_ = x[OpNamedCapture-27]
+	_ = x[OpGroup-28]
+	_ = x[OpGroupWithFlags-29]
+	_ = x[OpFlagOnlyGroup-30]
+	_ = x[OpNone2-31]
 }
 
-const _Operation_name = "NoneConcatDotAltStarPlusQuestionNonGreedyCaretDollarLiteralQuoteEscapeEscapeMetaEscapeOctalEscapeHexEscapeHexFullEscapeUniEscapeUniFullCharClassNegCharClassCharRangePosixClassRepeatCaptureNamedCaptureGroupGroupWithFlagsFlagOnlyGroupNone2"
+const _Operation_name = "NoneConcatDotAltStarPlusQuestionNonGreedyCaretDollarLiteralCharStringQuoteEscapeEscapeMetaEscapeOctalEscapeHexEscapeHexFullEscapeUniEscapeUniFullCharClassNegCharClassCharRangePosixClassRepeatCaptureNamedCaptureGroupGroupWithFlagsFlagOnlyGroupNone2"
 
-var _Operation_index = [...]uint8{0, 4, 10, 13, 16, 20, 24, 32, 41, 46, 52, 59, 64, 70, 80, 91, 100, 113, 122, 135, 144, 156, 165, 175, 181, 188, 200, 205, 219, 232, 237}
+var _Operation_index = [...]uint8{0, 4, 10, 13, 16, 20, 24, 32, 41, 46, 52, 59, 63, 69, 74, 80, 90, 101, 110, 123, 132, 145, 154, 166, 175, 185, 191, 198, 210, 215, 229, 242, 247}
 
 func (i Operation) String() string {
 	if i >= Operation(len(_Operation_index)-1) {

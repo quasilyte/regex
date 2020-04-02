@@ -41,7 +41,7 @@ func FormatSyntax(re *Regexp) string {
 
 func formatExprSyntax(re *Regexp, e Expr) string {
 	switch e.Op {
-	case OpLiteral:
+	case OpChar, OpLiteral:
 		s := re.ExprString(e)
 		switch s {
 		case "{":
@@ -51,7 +51,7 @@ func formatExprSyntax(re *Regexp, e Expr) string {
 		default:
 			return s
 		}
-	case OpEscape, OpEscapeMeta, OpEscapeOctal, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpPosixClass:
+	case OpString, OpEscape, OpEscapeMeta, OpEscapeOctal, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpPosixClass:
 		return re.ExprString(e)
 	case OpRepeat:
 		return fmt.Sprintf("(repeat %s %s)", formatExprSyntax(re, e.Args[0]), re.ExprString(e.Args[1]))
@@ -150,9 +150,17 @@ const (
 	// OpDollar is $ anchor.
 	OpDollar
 
-	// OpLiteral is a sequence of characters that are matched literally.
-	// Examples: `a` `abc`
+	// OpLiteral is a collection of consecutive chars.
+	// Examples: `ab` `10x`
+	// Args - enclosed characters (OpChar)
 	OpLiteral
+
+	// OpChar is a single literal pattern character.
+	// Examples: `a` `6` `ф`
+	OpChar
+
+	// OpString is an artificial element that is used in other expressions.
+	OpString
 
 	// OpQuote is a \Q...\E enclosed literal.
 	// Examples: `\Q.?\E` `\Q?q[]=1`
@@ -211,7 +219,7 @@ const (
 	// OpRepeat is a {min,max} repetition quantifier.
 	// Examples: `x{5}` `x{min,max}` `x{min,}`
 	// Args[0] - repeated expression
-	// Args[1] - repeat count (OpLiteral)
+	// Args[1] - repeat count (OpString)
 	OpRepeat
 
 	// OpCapture is `(re)` capturing group.
@@ -222,7 +230,7 @@ const (
 	// OpNamedCapture is `(?P<name>re)` capturing group.
 	// Examples: `(?P<foo>abc)` `(?P<name>x|y)`
 	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
-	// Args[1] - group name (OpLiteral)
+	// Args[1] - group name (OpString)
 	OpNamedCapture
 
 	// OpGroup is `(?:re)` non-capturing group.
@@ -233,12 +241,12 @@ const (
 	// OpGroupWithFlags is `(?flags:re)` non-capturing group.
 	// Examples: `(?i:abc)` `(?i:x|y)`
 	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
-	// Args[1] - flags (OpLiteral)
+	// Args[1] - flags (OpString)
 	OpGroupWithFlags
 
 	// OpFlagOnlyGroup is `(?flags)` form that affects current group flags.
 	// Examples: `(?i)` `(?i-m)` `(?-im)`
-	// Args[0] - flags (OpLiteral)
+	// Args[0] - flags (OpString)
 	OpFlagOnlyGroup
 
 	// OpNone2 is a sentinel value that is never part of the AST.

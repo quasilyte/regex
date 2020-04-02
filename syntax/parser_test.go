@@ -21,7 +21,7 @@ func TestParserErrors(t *testing.T) {
 		{`\p{L`, `can't find closing '}'`},
 	}
 
-	p := NewParser()
+	p := NewParser(nil)
 	for _, test := range tests {
 		_, err := p.Parse(test.pattern)
 		have := "<nil>"
@@ -54,11 +54,18 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 	}
 
 	switch e.Op {
-	case OpLiteral, OpQuote, OpPosixClass,
+	case OpChar, OpString, OpQuote, OpPosixClass,
 		OpEscape, OpEscapeMeta, OpEscapeUni, OpEscapeUniFull,
 		OpEscapeHex, OpEscapeHexFull, OpEscapeOctal,
 		OpDot, OpCaret, OpDollar:
 		w.WriteString(re.ExprString(e))
+
+	case OpLiteral:
+		assertBeginPos(e, e.Args[0].Begin())
+		assertEndPos(e, e.LastArg().End())
+		for _, a := range e.Args {
+			writeExpr(t, w, re, a)
+		}
 
 	case OpCharRange:
 		assertBeginPos(e, e.Args[0].Begin())
@@ -160,6 +167,8 @@ func TestWriteExpr(t *testing.T) {
 		o2  Operation
 	}{
 		{pat: `$`, o1: OpDollar},
+		{pat: `abc`, o1: OpLiteral},
+		{pat: `x{0}`, o1: OpChar, o2: OpString},
 		{pat: `a\x{BAD}`, o1: OpLiteral, o2: OpEscapeHexFull},
 		{pat: `(✓x✓x)`, o1: OpLiteral, o2: OpCapture},
 		{pat: `[x]`, o1: OpCharClass, o2: OpLiteral},
@@ -189,6 +198,7 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `x{1,}?.?.`, o1: OpNonGreedy, o2: OpDot},
 		{pat: `(?i)f.o`, o1: OpFlagOnlyGroup, o2: OpDot},
 		{pat: `(?:(?i)[^a-z]o)`, o1: OpFlagOnlyGroup, o2: OpNegCharClass},
+		{pat: `(?:(?P<foo>x))`, o1: OpString, o2: OpChar},
 
 		{pat: `\s*\{weight=(\d+)\}\s*`},
 		{pat: `[.?,!;:@#$%^&*()]+`},
@@ -213,7 +223,7 @@ func TestWriteExpr(t *testing.T) {
 		return b.String(), nil
 	}
 
-	p := NewParser()
+	p := NewParser(nil)
 	for _, test := range tests {
 		pattern := "_" + test.pat + "_"
 		re, err := p.Parse(pattern)
@@ -263,12 +273,12 @@ func TestParser(t *testing.T) {
 
 		// Simple literals and chars.
 		{` `, ` `},
-		{`  `, `{   }`},
+		{`  `, `  `},
 		{`x`, `x`},
-		{`abc`, `{a b c}`},
+		{`abc`, `abc`},
 		{`□`, `□`},
 		{`✓`, `✓`},
-		{`✓✓`, `{✓ ✓}`},
+		{`✓✓`, `✓✓`},
 
 		// Dots and alternations (or).
 		{`.`, `.`},
@@ -317,10 +327,10 @@ func TestParser(t *testing.T) {
 		{`x+|y+`, `(or (+ x) (+ y))`},
 		{`x+y+`, `{(+ x) (+ y)}`},
 		{`x+y+|z+`, `(or {(+ x) (+ y)} (+ z))`},
-		{`(ab)+`, `(+ (capture {a b}))`},
+		{`(ab)+`, `(+ (capture ab))`},
 		{`(.b)+`, `(+ (capture {. b}))`},
 		{`x+y*z+`, `{(+ x) (* y) (+ z)}`},
-		{`abc+`, `{a b (+ c)}`},
+		{`abc+`, `{ab (+ c)}`},
 
 		// Non-greedy modifiers.
 		{`x+?|y+?`, `(or (non-greedy (+ x)) (non-greedy (+ y)))`},
@@ -415,8 +425,8 @@ func TestParser(t *testing.T) {
 		{`[a-z]{5}`, `(repeat [a-z] {5})`},
 
 		// Invalid repeat expressions are parsed as normal chars.
-		{`.{a}`, `{. '{' a '}'}`},
-		{`.{-1}`, `{. '{' - 1 '}'}`},
+		{`.{a}`, `{. {a}}`},
+		{`.{-1}`, `{. {-1}}`},
 
 		// \Q...\E escape.
 		{`\Qa.b\E+z`, `{(+ (q \Qa.b\E)) z}`},
@@ -428,16 +438,20 @@ func TestParser(t *testing.T) {
 
 		// Incomplete `x|` expressions are valid.
 		// `|x` is not valid though.
-		{`(docker-|)`, `(capture (or {d o c k e r -} {}))`},
+		{`(docker-|)`, `(capture (or docker- {}))`},
 		{`x|`, `(or x {})`},
 
+		// More tests for char merging.
+		{`xy+`, `{x (+ y)}`},
+		{`.xy`, `{. xy}`},
+
 		// Tests from the patterns found in various GitHub projects.
-		{`Adm([^i]|$)`, `{A d m (capture (or [^i] $))}`},
+		{`Adm([^i]|$)`, `{Adm (capture (or [^i] $))}`},
 		{`\.(com|com\.\w{2})$`, `{\. (capture (or {c o m} {c o m \. (repeat \w {2})})) $}`},
 		{`(?i)a(?:x|y)b`, `{(flags ?i) a (group (or x y)) b}`},
 	}
 
-	p := NewParser()
+	p := NewParser(nil)
 	for _, test := range tests {
 		re, err := p.Parse(test.pattern)
 		if err != nil {
@@ -471,7 +485,7 @@ var benchmarkTests = []*struct {
 func BenchmarkParserPratt(b *testing.B) {
 	for _, test := range benchmarkTests {
 		b.Run(test.name, func(b *testing.B) {
-			p := NewParser()
+			p := NewParser(nil)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				_, err := p.Parse(test.pattern)

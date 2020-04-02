@@ -5,9 +5,17 @@ import (
 	"strings"
 )
 
-func NewParser() *Parser {
+type ParserOptions struct {
+	// NoLiterals disables OpChar merging into OpLiteral.
+	NoLiterals bool
+}
+
+func NewParser(opts *ParserOptions) *Parser {
 	var p Parser
 
+	if opts != nil {
+		p.opts = *opts
+	}
 	p.exprPool = make([]Expr, 256)
 
 	for tok, op := range tok2op {
@@ -30,7 +38,7 @@ func NewParser() *Parser {
 	}
 
 	p.infixParselets[tokRepeat] = func(left *Expr, tok token) *Expr {
-		repeatLit := p.newExpr(OpLiteral, tok.pos)
+		repeatLit := p.newExpr(OpString, tok.pos)
 		return p.newExpr(OpRepeat, combinePos(left.Pos, tok.pos), left, repeatLit)
 	}
 	p.infixParselets[tokPlus] = func(left *Expr, tok token) *Expr {
@@ -79,6 +87,8 @@ type Parser struct {
 
 	charClass []Expr
 	allocated uint
+
+	opts ParserOptions
 }
 
 type prefixParselet func(token) *Expr
@@ -107,7 +117,48 @@ func (p *Parser) Parse(pattern string) (result *Regexp, err error) {
 		p.out.Expr = *p.parseExpr(0)
 	}
 
+	if !p.opts.NoLiterals {
+		p.mergeChars(&p.out.Expr)
+	}
+
 	return &p.out, nil
+}
+
+func (p *Parser) mergeChars(e *Expr) {
+	if e.Op != OpConcat || len(e.Args) < 2 {
+		for i := range e.Args {
+			p.mergeChars(&e.Args[i])
+		}
+		return
+	}
+
+	args := e.Args[:0]
+	i := 0
+	for i < len(e.Args) {
+		first := i
+		chars := 0
+		for j := i; j < len(e.Args) && e.Args[j].Op == OpChar; j++ {
+			chars++
+		}
+		if chars > 1 {
+			c1 := e.Args[first]
+			c2 := e.Args[first+chars-1]
+			lit := p.newExpr(OpLiteral, combinePos(c1.Pos, c2.Pos))
+			for j := 0; j < chars; j++ {
+				lit.Args = append(lit.Args, e.Args[first+j])
+			}
+			args = append(args, *lit)
+			i += chars
+		} else {
+			args = append(args, e.Args[i])
+			i++
+		}
+	}
+	if len(args) == 1 {
+		*e = args[0] // Turn OpConcat into OpLiteral
+	} else {
+		e.Args = args
+	}
 }
 
 func (p *Parser) newExpr(op Operation, pos Position, args ...*Expr) *Expr {
@@ -189,14 +240,14 @@ func (p *Parser) parseCharClass(op Operation, tok token) *Expr {
 
 func (p *Parser) parseMinus(left *Expr, tok token) *Expr {
 	switch left.Op {
-	case OpEscapeMeta, OpLiteral:
+	case OpEscapeMeta, OpChar:
 		if next := p.lexer.Peek().kind; next == tokChar || next == tokEscapeMeta || next == tokMinus {
 			right := p.parseExpr(2)
 			return p.newExpr(OpCharRange, combinePos(left.Pos, right.Pos), left, right)
 		}
 	}
 	p.charClass = append(p.charClass, *left)
-	return p.newExpr(OpLiteral, tok.pos)
+	return p.newExpr(OpChar, tok.pos)
 }
 
 func (p *Parser) parseQuestion(left *Expr, tok token) *Expr {
@@ -223,7 +274,7 @@ func (p *Parser) parseCapture(tok token) *Expr {
 }
 
 func (p *Parser) parseNamedCapture(tok token) *Expr {
-	name := p.newExpr(OpLiteral, Position{
+	name := p.newExpr(OpString, Position{
 		Begin: tok.pos.Begin + uint16(len("(?P<")),
 		End:   tok.pos.End - uint16(len(">")),
 	})
@@ -238,7 +289,7 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 	val := p.out.Source[tok.pos.Begin+1 : tok.pos.End]
 	switch {
 	case !strings.HasSuffix(val, ":"):
-		flags := p.newExpr(OpLiteral, Position{
+		flags := p.newExpr(OpString, Position{
 			Begin: tok.pos.Begin + uint16(len("(")),
 			End:   tok.pos.End,
 		})
@@ -247,7 +298,7 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 		x := p.parseGroupItem(tok)
 		result = p.newExpr(OpGroup, tok.pos, x)
 	default:
-		flags := p.newExpr(OpLiteral, Position{
+		flags := p.newExpr(OpString, Position{
 			Begin: tok.pos.Begin + uint16(len("(")),
 			End:   tok.pos.End - uint16(len(":")),
 		})
@@ -275,8 +326,8 @@ var tok2op = [256]Operation{
 	tokDollar:        OpDollar,
 	tokCaret:         OpCaret,
 	tokDot:           OpDot,
-	tokChar:          OpLiteral,
-	tokMinus:         OpLiteral,
+	tokChar:          OpChar,
+	tokMinus:         OpChar,
 	tokEscape:        OpEscape,
 	tokEscapeMeta:    OpEscapeMeta,
 	tokEscapeHex:     OpEscapeHex,
