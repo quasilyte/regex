@@ -21,8 +21,6 @@ func TestParserErrors(t *testing.T) {
 		{`\p{L`, `can't find closing '}'`},
 	}
 
-	// TODO: handle incomplete expressions like `x|` and add error tests here.
-
 	p := NewParser()
 	for _, test := range tests {
 		_, err := p.Parse(test.pattern)
@@ -427,6 +425,11 @@ func TestParser(t *testing.T) {
 		{`x\Q`, `{x (q \Q)}`},
 		{`x\Qy`, `{x (q \Qy)}`},
 		{`x\Qyz`, `{x (q \Qyz)}`},
+
+		// Incomplete `x|` expressions are valid.
+		// `|x` is not valid though.
+		{`(docker-|)`, `(capture (or {d o c k e r -} {}))`},
+		{`x|`, `(or x {})`},
 
 		// Tests from the patterns found in various GitHub projects.
 		{`Adm([^i]|$)`, `{A d m (capture (or [^i] $))}`},

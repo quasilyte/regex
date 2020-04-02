@@ -40,7 +40,13 @@ func NewParser() *Parser {
 		return p.newExpr(OpStar, tok.pos, left)
 	}
 	p.infixParselets[tokPipe] = func(left *Expr, tok token) *Expr {
-		right := p.parseExpr(1)
+		var right *Expr
+		switch p.lexer.Peek().kind {
+		case tokRparen, tokNone:
+			right = p.newExpr(OpConcat, tok.pos)
+		default:
+			right = p.parseExpr(1)
+		}
 		if left.Op == OpAlt {
 			left.Args = append(left.Args, *right)
 			left.Pos.End = right.End()
