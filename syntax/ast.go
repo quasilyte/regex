@@ -11,7 +11,7 @@ type Regexp struct {
 }
 
 func (re *Regexp) ExprString(e Expr) string {
-	return re.Source[e.Pos.Begin:e.Pos.End]
+	return re.Source[e.Begin():e.End()]
 }
 
 type Expr struct {
@@ -20,9 +20,18 @@ type Expr struct {
 	Args []Expr
 }
 
+// Begin returns expression leftmost offset.
 func (e Expr) Begin() uint16 { return e.Pos.Begin }
 
+// End returns expression rightmost offset.
 func (e Expr) End() uint16 { return e.Pos.End }
+
+// LastArg returns expression last argument.
+//
+// Should not be called on expressions that may have 0 arguments.
+func (e Expr) LastArg() Expr {
+	return e.Args[len(e.Args)-1]
+}
 
 type Operation byte
 
@@ -99,8 +108,47 @@ func formatArgsSyntax(re *Regexp, args []Expr) string {
 const (
 	OpNone Operation = iota
 
-	OpCaret  // ^ at beginning of text or line
-	OpDollar // at end of text or line
+	// OpConcat is a concatenation of ops.
+	// Examples: `xy` `abc\d` ``
+	// Args - concatenated ops
+	//
+	// As a special case, OpConcat with 0 Args is used for "empty"
+	// set of operations.
+	OpConcat // xy concatenation of ops
+
+	// OpDot is a '.' wildcard.
+	OpDot
+
+	// OpAlt is x|y alternation of ops.
+	// Examples: `a|bc` `x(.*?)|y(.*?)`
+	// Args - union-connected regexp branches
+	OpAlt
+
+	// OpStar is a shorthand for {0,} repetition.
+	// Examples: `x*`
+	// Args[0] - repeated expression
+	OpStar
+
+	// OpPlus is a shorthand for {1,} repetition.
+	// Examples: `x+`
+	// Args[0] - repeated expression
+	OpPlus
+
+	// OpQuestion is a shorthand for {0,1} repetition.
+	// Examples: `x?`
+	// Args[0] - repeated expression
+	OpQuestion // x? zero or one x
+
+	// OpNonGreedy makes its operand quantifier non-greedy.
+	// Examples: `x??` `x*?` `x+?`
+	// Args[0] - quantified expression
+	OpNonGreedy
+
+	// OpCaret is ^ anchor.
+	OpCaret
+
+	// OpDollar is $ anchor.
+	OpDollar
 
 	// OpLiteral is a sequence of characters that are matched literally.
 	// Examples: `a` `abc`
@@ -142,12 +190,12 @@ const (
 
 	// OpCharClass is a char class enclosed in [].
 	// Examples: `[abc]` `[a-z0-9\]]`
-	// Args: char class elements (can include OpCharRange and OpPosixClass).
+	// Args - char class elements (can include OpCharRange and OpPosixClass).
 	OpCharClass
 
 	// OpNegCharClass is a negated char class enclosed in [].
 	// Examples: `[^abc]` `[^a-z0-9\]]`
-	// Args: char class elements (can include OpCharRange and OpPosixClass).
+	// Args - char class elements (can include OpCharRange and OpPosixClass).
 	OpNegCharClass
 
 	// OpCharRange is an inclusive char range inside a char class.
@@ -193,27 +241,7 @@ const (
 	// Args[0] - flags (OpLiteral)
 	OpFlagOnlyGroup
 
-	// OpConcat is a concatenation of ops.
-	// Examples: `xy` `abc\d` ``
-	// Args: concatenated ops
-	//
-	// As a special case, OpConcat with 0 Args is used for "empty"
-	// set of operations.
-	OpConcat // xy concatenation of ops
-
-	OpDot               // . any character, possibly including newline
-	OpPerlCharClass     // \d Perl character class
-	OpNegPerlCharClass  // \D negated Perl character class
-	OpNamedCharClass    // [[:alpha:]] ASCII character class
-	OpNegNamedCharClass // [[:^alpha:]] negated ASCII character class
-	OpUniCharClass      // \pN or \p{Greek} Unicode character class
-	OpNegUniCharClass   // \PN or \P{Greek} negated Unicode character class
-
-	OpAlt // x|y alternation of ops
-
-	OpStar     // x* zero or more x
-	OpPlus     // x+ one or more x
-	OpQuestion // x? zero or one x
-
-	OpNonGreedy // x? makes op x non-greedy
+	// OpNone2 is a sentinel value that is never part of the AST.
+	// OpNone and OpNone2 can be used to cover all ops in a range.
+	OpNone2
 )

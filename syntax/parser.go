@@ -43,17 +43,19 @@ func NewParser() *Parser {
 		right := p.parseExpr(1)
 		if left.Op == OpAlt {
 			left.Args = append(left.Args, *right)
+			left.Pos.End = right.End()
 			return left
 		}
-		return p.newExpr(OpAlt, tok.pos, left, right)
+		return p.newExpr(OpAlt, combinePos(left.Pos, right.Pos), left, right)
 	}
 	p.infixParselets[tokConcat] = func(left *Expr, tok token) *Expr {
 		right := p.parseExpr(2)
 		if left.Op == OpConcat {
 			left.Args = append(left.Args, *right)
+			left.Pos.End = right.End()
 			return left
 		}
-		return p.newExpr(OpConcat, tok.pos, left, right)
+		return p.newExpr(OpConcat, combinePos(left.Pos, right.Pos), left, right)
 	}
 	p.infixParselets[tokMinus] = p.parseMinus
 	p.infixParselets[tokQuestion] = p.parseQuestion
@@ -123,11 +125,12 @@ func (p *Parser) allocExpr() *Expr {
 	return &Expr{}
 }
 
-func (p *Parser) expect(kind tokenKind) {
+func (p *Parser) expect(kind tokenKind) Position {
 	tok := p.lexer.NextToken()
 	if tok.kind != kind {
 		throwErrorf(int(tok.pos.Begin), int(tok.pos.End), "expected '%s', found '%s'", kind, tok.kind)
 	}
+	return tok.pos
 }
 
 func (p *Parser) parseExpr(precedence int) *Expr {
@@ -183,7 +186,7 @@ func (p *Parser) parseMinus(left *Expr, tok token) *Expr {
 	case OpEscapeMeta, OpLiteral:
 		if next := p.lexer.Peek().kind; next == tokChar || next == tokEscapeMeta || next == tokMinus {
 			right := p.parseExpr(2)
-			return p.newExpr(OpCharRange, tok.pos, left, right)
+			return p.newExpr(OpCharRange, combinePos(left.Pos, right.Pos), left, right)
 		}
 	}
 	p.charClass = append(p.charClass, *left)
@@ -201,7 +204,7 @@ func (p *Parser) parseQuestion(left *Expr, tok token) *Expr {
 
 func (p *Parser) parseGroupItem(tok token) *Expr {
 	if p.lexer.Peek().kind == tokRparen {
-		return p.newExpr(OpConcat, Position{})
+		return p.newExpr(OpConcat, tok.pos)
 	}
 	return p.parseExpr(0)
 }
@@ -209,7 +212,7 @@ func (p *Parser) parseGroupItem(tok token) *Expr {
 func (p *Parser) parseCapture(tok token) *Expr {
 	x := p.parseGroupItem(tok)
 	result := p.newExpr(OpCapture, tok.pos, x)
-	p.expect(tokRparen)
+	result.Pos.End = p.expect(tokRparen).End
 	return result
 }
 
@@ -220,7 +223,7 @@ func (p *Parser) parseNamedCapture(tok token) *Expr {
 	})
 	x := p.parseGroupItem(tok)
 	result := p.newExpr(OpNamedCapture, tok.pos, x, name)
-	p.expect(tokRparen)
+	result.Pos.End = p.expect(tokRparen).End
 	return result
 }
 
@@ -233,8 +236,7 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 			Begin: tok.pos.Begin + uint16(len("(")),
 			End:   tok.pos.End,
 		})
-		pos2 := p.lexer.Peek().pos
-		result = p.newExpr(OpFlagOnlyGroup, combinePos(tok.pos, pos2), flags)
+		result = p.newExpr(OpFlagOnlyGroup, tok.pos, flags)
 	case val == "?:":
 		x := p.parseGroupItem(tok)
 		result = p.newExpr(OpGroup, tok.pos, x)
@@ -246,7 +248,7 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 		x := p.parseGroupItem(tok)
 		result = p.newExpr(OpGroupWithFlags, tok.pos, x, flags)
 	}
-	p.expect(tokRparen)
+	result.Pos.End = p.expect(tokRparen).End
 	return result
 }
 
@@ -254,9 +256,9 @@ func (p *Parser) precedenceOf(tok token) int {
 	switch tok.kind {
 	case tokPipe:
 		return 1
-	case tokConcat:
+	case tokConcat, tokMinus:
 		return 2
-	case tokPlus, tokStar, tokQuestion, tokMinus, tokRepeat:
+	case tokPlus, tokStar, tokQuestion, tokRepeat:
 		return 3
 	default:
 		return 0

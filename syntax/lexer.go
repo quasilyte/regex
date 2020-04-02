@@ -172,13 +172,15 @@ func (l *lexer) Init(s string) error {
 			pushMetaTok(tokPipe)
 
 		case '{':
-			j := l.repeatWidth(i + 1)
-			if j >= 0 {
-				size += j
-				pushTok(tokRepeat)
-			} else {
-				pushTok(tokChar)
+			if !insideCharClass {
+				j := l.repeatWidth(i + 1)
+				if j >= 0 {
+					size += j
+					pushTok(tokRepeat)
+					break
+				}
 			}
+			pushTok(tokChar)
 
 		case '-':
 			if insideCharClass {
@@ -325,15 +327,15 @@ func (l *lexer) groupFlagsWidth(pos int) int {
 	if l.byteAt(pos) != '?' {
 		return -1
 	}
-	end := strings.IndexByte(l.input[pos:], ':')
-	if end >= 0 {
-		return end + len(":")
+	colonPos := strings.IndexByte(l.input[pos:], ':')
+	parenPos := strings.IndexByte(l.input[pos:], ')')
+	if parenPos < 0 {
+		return -1
 	}
-	end = strings.IndexByte(l.input[pos:], ')')
-	if end >= 0 {
-		return end
+	if colonPos >= 0 && colonPos < parenPos {
+		return colonPos + len(":")
 	}
-	return -1
+	return parenPos
 }
 
 func (l *lexer) repeatWidth(pos int) int {

@@ -1,7 +1,9 @@
 package syntax
 
 import (
+	"fmt"
 	"regexp/syntax"
+	"strings"
 	"testing"
 )
 
@@ -31,6 +33,210 @@ func TestParserErrors(t *testing.T) {
 		if have != test.want {
 			t.Errorf("parse(%q):\nhave: %s\nwant: %s",
 				test.pattern, have, test.want)
+		}
+	}
+}
+
+func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
+	assertBeginPos := func(e Expr, begin uint16) {
+		if e.Begin() != begin {
+			t.Errorf("`%s`: %s begin pos mismatch:\nhave: `%s` (begin=%d)\nwant: `%s` (begin=%d)",
+				re.Source, e.Op,
+				re.Source[e.Begin():e.End()], e.Begin(),
+				re.Source[begin:e.End()], begin)
+		}
+	}
+	assertEndPos := func(e Expr, end uint16) {
+		if e.End() != end {
+			t.Errorf("`%s`: %s end pos mismatch:\nhave: `%s` (end=%d)\nwant: `%s` (end=%d)",
+				re.Source, e.Op,
+				re.Source[e.Begin():e.End()], e.End(),
+				re.Source[e.Begin():end], end)
+		}
+	}
+
+	switch e.Op {
+	case OpLiteral, OpQuote, OpPosixClass:
+		w.WriteString(re.ExprString(e))
+	case OpEscape, OpEscapeMeta, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpEscapeOctal:
+		w.WriteString(re.ExprString(e))
+	case OpDot, OpCaret, OpDollar:
+		w.WriteString(re.ExprString(e))
+	case OpCharRange:
+		assertBeginPos(e, e.Args[0].Begin())
+		assertEndPos(e, e.Args[1].End())
+		writeExpr(t, w, re, e.Args[0])
+		w.WriteByte('-')
+		writeExpr(t, w, re, e.Args[1])
+	case OpNamedCapture:
+		assertEndPos(e, e.Args[0].End()+1)
+		fmt.Fprintf(w, "(?P<%s>", re.ExprString(e.Args[1]))
+		writeExpr(t, w, re, e.Args[0])
+		w.WriteByte(')')
+	case OpFlagOnlyGroup:
+		assertEndPos(e, e.Args[0].End()+1)
+		w.WriteByte('(')
+		w.WriteString(re.ExprString(e.Args[0]))
+		w.WriteByte(')')
+	case OpGroupWithFlags:
+		assertEndPos(e, e.Args[0].End()+1)
+		w.WriteByte('(')
+		w.WriteString(re.ExprString(e.Args[1]))
+		w.WriteByte(':')
+		writeExpr(t, w, re, e.Args[0])
+		w.WriteByte(')')
+	case OpCapture, OpGroup:
+		assertEndPos(e, e.Args[0].End()+1)
+		w.WriteByte('(')
+		if e.Op == OpGroup {
+			w.WriteString("?:")
+		}
+		writeExpr(t, w, re, e.Args[0])
+		w.WriteByte(')')
+	case OpCharClass, OpNegCharClass:
+		assertEndPos(e, e.LastArg().End()+1)
+		w.WriteByte('[')
+		if e.Op == OpNegCharClass {
+			w.WriteByte('^')
+		}
+		for _, a := range e.Args {
+			writeExpr(t, w, re, a)
+		}
+		w.WriteByte(']')
+	case OpRepeat:
+		assertBeginPos(e, e.Args[0].Begin())
+		assertEndPos(e, e.Args[1].End())
+		writeExpr(t, w, re, e.Args[0])
+		writeExpr(t, w, re, e.Args[1])
+	case OpConcat:
+		assertBeginPos(e, e.Begin())
+		if len(e.Args) > 0 {
+			assertEndPos(e, e.LastArg().End())
+		}
+		for _, a := range e.Args {
+			writeExpr(t, w, re, a)
+		}
+	case OpAlt:
+		assertBeginPos(e, e.Begin())
+		assertEndPos(e, e.LastArg().End())
+		for i, a := range e.Args {
+			writeExpr(t, w, re, a)
+			if i != len(e.Args)-1 {
+				w.WriteByte('|')
+			}
+		}
+	case OpNonGreedy, OpQuestion:
+		assertEndPos(e, e.Args[0].End()+1)
+		writeExpr(t, w, re, e.Args[0])
+		w.WriteByte('?')
+	case OpPlus:
+		assertEndPos(e, e.Args[0].End()+1)
+		writeExpr(t, w, re, e.Args[0])
+		w.WriteByte('+')
+	case OpStar:
+		assertEndPos(e, e.Args[0].End()+1)
+		writeExpr(t, w, re, e.Args[0])
+		w.WriteByte('*')
+
+	default:
+		panic(fmt.Sprintf("unhandled %s", e.Op))
+	}
+}
+
+func TestWriteExpr(t *testing.T) {
+	// Tests that ensure that we can print the source regexp
+	// using the parsed AST.
+	// They also verify that AST node positions are correct.
+
+	tests := []struct {
+		pat string
+		o1  Operation
+		o2  Operation
+	}{
+		{pat: `$`, o1: OpDollar},
+		{pat: `a\x{BAD}`, o1: OpLiteral, o2: OpEscapeHexFull},
+		{pat: `(✓x✓x)`, o1: OpLiteral, o2: OpCapture},
+		{pat: `[x]`, o1: OpCharClass, o2: OpLiteral},
+		{pat: `[A-Za-z0-9-]`, o1: OpCharClass, o2: OpCharRange},
+		{pat: `x{1}yz`, o1: OpLiteral, o2: OpRepeat},
+		{pat: `x{1,2}y*`, o1: OpRepeat, o2: OpStar},
+		{pat: `x{11,30}y+`, o1: OpRepeat, o2: OpPlus},
+		{pat: `x{1,}$`, o1: OpRepeat, o2: OpDollar},
+		{pat: `\p{Cyrillic}\d`, o1: OpEscapeUniFull, o2: OpEscape},
+		{pat: `x\p{Greek}y+?`, o1: OpEscapeUniFull, o2: OpNonGreedy},
+		{pat: `x\p{L}+y`, o1: OpEscapeUniFull, o2: OpPlus},
+		{pat: `^\pL`, o1: OpEscapeUni, o2: OpCaret},
+		{pat: `^x\pLy`, o1: OpEscapeUni, o2: OpCaret},
+		{pat: `\d?`, o1: OpEscape, o2: OpQuestion},
+		{pat: `[\xC0-\xC6]`, o1: OpCharRange, o2: OpEscapeHex},
+		{pat: `\01\xff`, o1: OpEscapeOctal, o2: OpEscapeHex},
+		{pat: `\111x\Qabc`, o1: OpEscapeOctal, o2: OpQuote},
+		{pat: `x\Qabc\E.(?:s:..)`, o1: OpQuote, o2: OpGroupWithFlags},
+		{pat: `(?i:foo[[:^alpha:]])`, o1: OpGroupWithFlags, o2: OpPosixClass},
+		{pat: `a[[:digit:]\]]`, o1: OpPosixClass, o2: OpEscapeMeta},
+		{pat: `(?:fa*)`, o1: OpGroup, o2: OpStar},
+		{pat: `(?:x)|(?:y)`, o1: OpGroup, o2: OpAlt},
+		{pat: `(foo|ba?r)`, o1: OpAlt, o2: OpQuestion},
+		{pat: `(?P<1>xy\x{F})`, o1: OpNamedCapture, o2: OpEscapeHexFull},
+		{pat: `(?P<x>)[^12]+?`, o1: OpNamedCapture, o2: OpNegCharClass},
+		{pat: `()\(`, o1: OpCapture, o2: OpEscapeMeta},
+		{pat: `x{1,}?.?.`, o1: OpNonGreedy, o2: OpDot},
+		{pat: `(?i)f.o`, o1: OpFlagOnlyGroup, o2: OpDot},
+		{pat: `(?:(?i)[^a-z]o)`, o1: OpFlagOnlyGroup, o2: OpNegCharClass},
+
+		{pat: `\s*\{weight=(\d+)\}\s*`},
+		{pat: `[.?,!;:@#$%^&*()]+`},
+		{pat: `--(?P<var_name>[\\w-]+?):\\s+?(?P<var_val>.+?);`},
+		{pat: `^ *(#{1,6}) *([^\n]+?) *#* *(?:\n|$)`},
+		{pat: `^4\d{12}(\d{3})?$`},
+	}
+
+	const minTests = 2
+	toCover := make(map[Operation]int)
+	for op := OpNone + 1; op < OpNone2; op++ {
+		switch op {
+		case OpConcat:
+			continue
+		}
+		toCover[op] = minTests
+	}
+
+	exprToString := func(re *Regexp) (s string, err error) {
+		var b strings.Builder
+		writeExpr(t, &b, re, re.Expr)
+		return b.String(), nil
+	}
+
+	p := NewParser()
+	for _, test := range tests {
+		pattern := "_" + test.pat + "_"
+		re, err := p.Parse(pattern)
+		if err != nil {
+			t.Fatalf("parse(%q): %v", test.pat, err)
+		}
+		have, err := exprToString(re)
+		if err != nil {
+			t.Fatalf("stringify(%q): %v", test.pat, err)
+		}
+		want := pattern
+		if have != want {
+			t.Fatalf("result mismatch:\nhave: `%s`\nwant: `%s`", have, want)
+		}
+		if test.o1 != 0 {
+			toCover[test.o1]--
+		}
+		if test.o2 != 0 {
+			toCover[test.o2]--
+			if test.o2 == test.o1 {
+				t.Fatalf("%s: o1==o2", test.pat)
+			}
+		}
+	}
+
+	for op, n := range toCover {
+		if n > 0 {
+			t.Errorf("not enough tests for %s: want %d, have %d",
+				op, minTests, minTests-n)
 		}
 	}
 }
@@ -83,6 +289,7 @@ func TestParser(t *testing.T) {
 		{`x(?:)y`, `{x (group {}) y}`},
 		{`x(?:.)y`, `{x (group .) y}`},
 		{`x(?:ab)y`, `{x (group {a b}) y}`},
+		{`(?:a|b)`, `(group (or a b))`},
 
 		// Flag-only groups.
 		{`x(?i)y`, `{x (flags ?i) y}`},
@@ -151,10 +358,15 @@ func TestParser(t *testing.T) {
 		{`[a-]`, `[a -]`},
 		{`[a-z]a`, `{[a-z] a}`},
 		{`[a-z0-9]`, `[a-z 0-9]`},
+		{`[0-9-]`, `[0-9 -]`},
 		{`[\da-z_A-Z]`, `[\d a-z _ A-Z]`},
 		{`[\(-\)ab]`, `[\(-\) a b]`},
 		{`[\]\]\d]a`, `{[\] \] \d] a}`},
 		{`[[\[]a`, `{[[ \[] a}`},
+		{`[a|b]`, `[a | b]`},
+		{`[a+b]`, `[a + b]`},
+		{`[a*b]`, `[a * b]`},
+		{`[x{1}]`, `[x '{' 1 '}']`},
 
 		// Negated char classes.
 		{`[^]`, `[^]`},
@@ -211,6 +423,7 @@ func TestParser(t *testing.T) {
 		// Tests from the patterns found in various GitHub projects.
 		{`Adm([^i]|$)`, `{A d m (capture (or [^i] $))}`},
 		{`\.(com|com\.\w{2})$`, `{\. (capture (or {c o m} {c o m \. (repeat \w {2})})) $}`},
+		{`(?i)a(?:x|y)b`, `{(flags ?i) a (group (or x y)) b}`},
 	}
 
 	p := NewParser()

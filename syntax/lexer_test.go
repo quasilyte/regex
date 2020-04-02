@@ -22,12 +22,14 @@ func TestLexer(t *testing.T) {
 		{`x|x|x`, `Char | Char | Char`},
 		{`x|xx|xxx`, `Char | Char Concat Char | Char Concat Char Concat Char`},
 
+		{`()`, `( )`},
 		{`(x)`, `( Char )`},
 		{`((x))`, `( ( Char ) )`},
 		{`(x)|x`, `( Char ) | Char`},
 		{`x|(x)`, `Char | ( Char )`},
 		{`(x)|(x)`, `( Char ) | ( Char )`},
 		{`x(x)`, `Char Concat ( Char )`},
+		{`(✓x✓x)`, `( Char Concat Char Concat Char Concat Char )`},
 
 		{`(?P<1>)`, `(?P<name> )`},
 		{`(?P<foo>x)`, `(?P<name> Char )`},
@@ -72,6 +74,7 @@ func TestLexer(t *testing.T) {
 		{`aa[\]1\]]`, `Char Concat Char Concat [ EscapeMeta Char EscapeMeta ]`},
 		{`aa[1\]\]2]`, `Char Concat Char Concat [ Char EscapeMeta EscapeMeta Char ]`},
 		{`[a-z0-9]a`, `[ Char - Char Char - Char ] Concat Char`},
+		{`[0-9-]`, `[ Char - Char - ]`},
 		{`[\d-\w]`, `[ Escape - Escape ]`},
 		{`[\(-\)]`, `[ EscapeMeta - EscapeMeta ]`},
 		{`[\[-\]]`, `[ EscapeMeta - EscapeMeta ]`},
@@ -79,6 +82,7 @@ func TestLexer(t *testing.T) {
 		{`[|]`, `[ Char ]`},
 		{`[(-)]`, `[ Char - Char ]`},
 		{`[$.+*^?]`, `[ Char Char Char Char Char Char ]`},
+		{`[x{1}]`, `[ Char Char Char Char ]`},
 
 		{`[^]`, `[^ ]`},
 		{`[^^]`, `[^ Char ]`},
