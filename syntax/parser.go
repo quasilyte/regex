@@ -120,8 +120,16 @@ func (p *Parser) Parse(pattern string) (result *Regexp, err error) {
 	if !p.opts.NoLiterals {
 		p.mergeChars(&p.out.Expr)
 	}
+	p.setValues(&p.out.Expr)
 
 	return &p.out, nil
+}
+
+func (p *Parser) setValues(e *Expr) {
+	for i := range e.Args {
+		p.setValues(&e.Args[i])
+	}
+	e.Value = p.out.Source[e.Begin():e.End()]
 }
 
 func (p *Parser) mergeChars(e *Expr) {
@@ -175,9 +183,10 @@ func (p *Parser) newExpr(op Operation, pos Position, args ...*Expr) *Expr {
 }
 
 func (p *Parser) allocExpr() *Expr {
-	if p.allocated < uint(len(p.exprPool)) {
+	i := p.allocated
+	if i < uint(len(p.exprPool)) {
 		p.allocated++
-		return &p.exprPool[p.allocated]
+		return &p.exprPool[i]
 	}
 	return &Expr{}
 }

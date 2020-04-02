@@ -58,7 +58,7 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 		OpEscape, OpEscapeMeta, OpEscapeUni, OpEscapeUniFull,
 		OpEscapeHex, OpEscapeHexFull, OpEscapeOctal,
 		OpDot, OpCaret, OpDollar:
-		w.WriteString(re.ExprString(e))
+		w.WriteString(e.Value)
 
 	case OpLiteral:
 		assertBeginPos(e, e.Args[0].Begin())
@@ -76,20 +76,20 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 
 	case OpNamedCapture:
 		assertEndPos(e, e.Args[0].End()+1)
-		fmt.Fprintf(w, "(?P<%s>", re.ExprString(e.Args[1]))
+		fmt.Fprintf(w, "(?P<%s>", e.Args[1].Value)
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
 
 	case OpFlagOnlyGroup:
 		assertEndPos(e, e.Args[0].End()+1)
 		w.WriteByte('(')
-		w.WriteString(re.ExprString(e.Args[0]))
+		w.WriteString(e.Args[0].Value)
 		w.WriteByte(')')
 
 	case OpGroupWithFlags:
 		assertEndPos(e, e.Args[0].End()+1)
 		w.WriteByte('(')
-		w.WriteString(re.ExprString(e.Args[1]))
+		w.WriteString(e.Args[1].Value)
 		w.WriteByte(':')
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
