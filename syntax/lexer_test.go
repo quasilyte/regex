@@ -118,6 +118,7 @@ func TestLexer(t *testing.T) {
 		{`\xFF`, `EscapeHex`},
 		{`\xab`, `EscapeHex`},
 		{`\x10a`, `EscapeHex Concat Char`},
+		{`\x1\x2`, `EscapeHex Concat EscapeHex`},
 
 		{`\x{}a`, `EscapeHexFull Concat Char`},
 		{`\x{f}a`, `EscapeHexFull Concat Char`},

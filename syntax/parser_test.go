@@ -39,17 +39,17 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 	assertBeginPos := func(e Expr, begin uint16) {
 		if e.Begin() != begin {
 			t.Errorf("`%s`: %s begin pos mismatch:\nhave: `%s` (begin=%d)\nwant: `%s` (begin=%d)",
-				re.Source, e.Op,
-				re.Source[e.Begin():e.End()], e.Begin(),
-				re.Source[begin:e.End()], begin)
+				re.Pattern, e.Op,
+				re.Pattern[e.Begin():e.End()], e.Begin(),
+				re.Pattern[begin:e.End()], begin)
 		}
 	}
 	assertEndPos := func(e Expr, end uint16) {
 		if e.End() != end {
 			t.Errorf("`%s`: %s end pos mismatch:\nhave: `%s` (end=%d)\nwant: `%s` (end=%d)",
-				re.Source, e.Op,
-				re.Source[e.Begin():e.End()], e.End(),
-				re.Source[e.Begin():end], end)
+				re.Pattern, e.Op,
+				re.Pattern[e.Begin():e.End()], e.End(),
+				re.Pattern[e.Begin():end], end)
 		}
 	}
 
@@ -360,6 +360,10 @@ func TestParser(t *testing.T) {
 		{`\xfff`, `{\xff f}`},
 		{`\xab1`, `{\xab 1}`},
 
+		// This is not a valid syntax for hex escapes, but PHP-PCRE accepts them.
+		// Regexp validator can report them, if enabled.
+		{`\x2[\x3\x4]`, `{\x2 [\x3 \x4]}`},
+
 		// Full hex escapes.
 		{`\x{}b`, `{\x{} b}`},
 		{`\x{1}b`, `{\x{1} b}`},
@@ -436,10 +440,12 @@ func TestParser(t *testing.T) {
 		{`x\Qy`, `{x (q \Qy)}`},
 		{`x\Qyz`, `{x (q \Qyz)}`},
 
-		// Incomplete `x|` expressions are valid.
-		// `|x` is not valid though.
+		// Incomplete `x|` and `|x` expressions are valid.
 		{`(docker-|)`, `(capture (or docker- {}))`},
 		{`x|`, `(or x {})`},
+		{`|x`, `(or {} x)`},
+		{`(|x|y)`, `(capture (or {} x y))`},
+		{`(?:|x)`, `(group (or {} x))`},
 
 		// More tests for char merging.
 		{`xy+`, `{x (+ y)}`},

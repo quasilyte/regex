@@ -6,8 +6,17 @@ import (
 )
 
 type Regexp struct {
-	Source string
-	Expr   Expr
+	Pattern string
+	Expr    Expr
+}
+
+type RegexpPCRE struct {
+	Pattern string
+	Expr    Expr
+
+	Source    string
+	Modifiers string
+	Delim     [2]rune
 }
 
 type Expr struct {

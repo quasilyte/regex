@@ -1,6 +1,7 @@
 package syntax
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -30,6 +31,11 @@ func NewParser(opts *ParserOptions) *Parser {
 	p.prefixParselets[tokLparenName] = p.parseNamedCapture
 	p.prefixParselets[tokLparenFlags] = p.parseGroupWithFlags
 
+	p.prefixParselets[tokPipe] = func(tok token) *Expr {
+		// We need prefix pipe parselet to handle `(|x)` syntax.
+		right := p.parseExpr(1)
+		return p.newExpr(OpAlt, tok.pos, p.newEmpty(tok.pos), right)
+	}
 	p.prefixParselets[tokLbracket] = func(tok token) *Expr {
 		return p.parseCharClass(OpCharClass, tok)
 	}
@@ -47,21 +53,6 @@ func NewParser(opts *ParserOptions) *Parser {
 	p.infixParselets[tokStar] = func(left *Expr, tok token) *Expr {
 		return p.newExpr(OpStar, tok.pos, left)
 	}
-	p.infixParselets[tokPipe] = func(left *Expr, tok token) *Expr {
-		var right *Expr
-		switch p.lexer.Peek().kind {
-		case tokRparen, tokNone:
-			right = p.newExpr(OpConcat, tok.pos)
-		default:
-			right = p.parseExpr(1)
-		}
-		if left.Op == OpAlt {
-			left.Args = append(left.Args, *right)
-			left.Pos.End = right.End()
-			return left
-		}
-		return p.newExpr(OpAlt, combinePos(left.Pos, right.Pos), left, right)
-	}
 	p.infixParselets[tokConcat] = func(left *Expr, tok token) *Expr {
 		right := p.parseExpr(2)
 		if left.Op == OpConcat {
@@ -71,6 +62,7 @@ func NewParser(opts *ParserOptions) *Parser {
 		}
 		return p.newExpr(OpConcat, combinePos(left.Pos, right.Pos), left, right)
 	}
+	p.infixParselets[tokPipe] = p.parseAlt
 	p.infixParselets[tokMinus] = p.parseMinus
 	p.infixParselets[tokQuestion] = p.parseQuestion
 
@@ -95,6 +87,18 @@ type prefixParselet func(token) *Expr
 
 type infixParselet func(*Expr, token) *Expr
 
+func (p *Parser) ParsePCRE(pattern string) (*RegexpPCRE, error) {
+	pcre, err := p.newPCRE(pattern)
+	if err != nil {
+		return nil, err
+	}
+	re, err := p.Parse(pcre.Pattern)
+	if re != nil {
+		pcre.Expr = re.Expr
+	}
+	return pcre, err
+}
+
 func (p *Parser) Parse(pattern string) (result *Regexp, err error) {
 	defer func() {
 		r := recover()
@@ -110,7 +114,7 @@ func (p *Parser) Parse(pattern string) (result *Regexp, err error) {
 
 	p.lexer.Init(pattern)
 	p.allocated = 0
-	p.out.Source = pattern
+	p.out.Pattern = pattern
 	if pattern == "" {
 		p.out.Expr = *p.newExpr(OpConcat, Position{})
 	} else {
@@ -129,7 +133,7 @@ func (p *Parser) setValues(e *Expr) {
 	for i := range e.Args {
 		p.setValues(&e.Args[i])
 	}
-	e.Value = p.out.Source[e.Begin():e.End()]
+	e.Value = p.out.Pattern[e.Begin():e.End()]
 }
 
 func (p *Parser) mergeChars(e *Expr) {
@@ -182,6 +186,10 @@ func (p *Parser) newExpr(op Operation, pos Position, args ...*Expr) *Expr {
 	return e
 }
 
+func (p *Parser) newEmpty(pos Position) *Expr {
+	return p.newExpr(OpConcat, pos)
+}
+
 func (p *Parser) allocExpr() *Expr {
 	i := p.allocated
 	if i < uint(len(p.exprPool)) {
@@ -203,7 +211,7 @@ func (p *Parser) parseExpr(precedence int) *Expr {
 	tok := p.lexer.NextToken()
 	prefix := p.prefixParselets[tok.kind]
 	if prefix == nil {
-		panic(fmt.Errorf("unexpected token: %v", tok))
+		throwfPos(tok.pos, "unexpected token: %v", tok)
 	}
 	left := prefix(tok)
 
@@ -268,9 +276,27 @@ func (p *Parser) parseQuestion(left *Expr, tok token) *Expr {
 	return p.newExpr(op, tok.pos, left)
 }
 
+func (p *Parser) parseAlt(left *Expr, tok token) *Expr {
+	var right *Expr
+	switch p.lexer.Peek().kind {
+	case tokRparen, tokNone:
+		// This is needed to handle `(x|)` syntax.
+		right = p.newEmpty(tok.pos)
+	default:
+		right = p.parseExpr(1)
+	}
+	if left.Op == OpAlt {
+		left.Args = append(left.Args, *right)
+		left.Pos.End = right.End()
+		return left
+	}
+	return p.newExpr(OpAlt, combinePos(left.Pos, right.Pos), left, right)
+}
+
 func (p *Parser) parseGroupItem(tok token) *Expr {
 	if p.lexer.Peek().kind == tokRparen {
-		return p.newExpr(OpConcat, tok.pos)
+		// This is needed to handle `() syntax.`
+		return p.newEmpty(tok.pos)
 	}
 	return p.parseExpr(0)
 }
@@ -295,7 +321,7 @@ func (p *Parser) parseNamedCapture(tok token) *Expr {
 
 func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 	var result *Expr
-	val := p.out.Source[tok.pos.Begin+1 : tok.pos.End]
+	val := p.out.Pattern[tok.pos.Begin+1 : tok.pos.End]
 	switch {
 	case !strings.HasSuffix(val, ":"):
 		flags := p.newExpr(OpString, Position{
@@ -329,6 +355,47 @@ func (p *Parser) precedenceOf(tok token) int {
 	default:
 		return 0
 	}
+}
+
+func (p *Parser) newPCRE(source string) (*RegexpPCRE, error) {
+	if len(source) == 0 {
+		return nil, errors.New("empty pattern: can't find delimiters")
+	}
+
+	delim := source[0]
+	endDelim := delim
+	switch delim {
+	case '(':
+		endDelim = ')'
+	case '{':
+		endDelim = '}'
+	case '[':
+		endDelim = ']'
+	case '<':
+		endDelim = '>'
+	case '\\':
+		return nil, errors.New("'\\' is not a valid delimiter")
+	default:
+		if isSpace(delim) {
+			return nil, errors.New("whitespace is not a valid delimiter")
+		}
+		if isAlphanumeric(delim) {
+			return nil, fmt.Errorf("'%c' is not a valid delimiter", delim)
+		}
+	}
+
+	j := strings.LastIndexByte(source, endDelim)
+	if j == -1 {
+		return nil, fmt.Errorf("can't find '%c' ending delimiter", endDelim)
+	}
+
+	pcre := &RegexpPCRE{
+		Pattern:   source[1:j],
+		Source:    source,
+		Delim:     [2]rune{rune(delim), rune(endDelim)},
+		Modifiers: source[j+1:],
+	}
+	return pcre, nil
 }
 
 var tok2op = [256]Operation{

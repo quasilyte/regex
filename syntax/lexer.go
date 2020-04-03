@@ -249,7 +249,11 @@ func (l *lexer) Init(s string) error {
 					size += j + len("x{")
 					pushTok(tokEscapeHexFull)
 				} else {
-					size += 3
+					if l.isHexDigit(l.byteAt(i + 3)) {
+						size += 3
+					} else {
+						size += 2
+					}
 					pushTok(tokEscapeHex)
 				}
 			case l.isOctalDigit(s[i+1]):
@@ -375,6 +379,12 @@ func (l *lexer) isDigit(ch byte) bool {
 
 func (l *lexer) isOctalDigit(ch byte) bool {
 	return ch >= '0' && ch <= '7'
+}
+
+func (l *lexer) isHexDigit(ch byte) bool {
+	return (ch >= '0' && ch <= '9') ||
+		(ch >= 'a' && ch <= 'f') ||
+		(ch >= 'A' && ch <= 'F')
 }
 
 func (l *lexer) isConcatPos() bool {
