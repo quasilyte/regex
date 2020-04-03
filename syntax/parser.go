@@ -92,6 +92,9 @@ func (p *Parser) ParsePCRE(pattern string) (*RegexpPCRE, error) {
 	if err != nil {
 		return nil, err
 	}
+	if pcre.HasModifier('x') {
+		return nil, errors.New("'x' modifier is not supported")
+	}
 	re, err := p.Parse(pcre.Pattern)
 	if re != nil {
 		pcre.Expr = re.Expr
@@ -408,7 +411,7 @@ func (p *Parser) newPCRE(source string) (*RegexpPCRE, error) {
 	pcre := &RegexpPCRE{
 		Pattern:   source[1:j],
 		Source:    source,
-		Delim:     [2]rune{rune(delim), rune(endDelim)},
+		Delim:     [2]byte{delim, endDelim},
 		Modifiers: source[j+1:],
 	}
 	return pcre, nil

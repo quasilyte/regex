@@ -16,7 +16,11 @@ type RegexpPCRE struct {
 
 	Source    string
 	Modifiers string
-	Delim     [2]rune
+	Delim     [2]byte
+}
+
+func (re *RegexpPCRE) HasModifier(mod byte) bool {
+	return strings.IndexByte(re.Modifiers, mod) >= 0
 }
 
 type Expr struct {
