@@ -70,20 +70,7 @@ var reMetachar = [256]bool{
 // charClassMetachar is a table of meta chars inside char class.
 var charClassMetachar = [256]bool{
 	'-': true,
-
-	// ...plus all chars from the reMetachar.
-	'\\': true,
-	'|':  true,
-	'*':  true,
-	'+':  true,
-	'?':  true,
-	'.':  true,
-	'[':  true,
-	']':  true,
-	'^':  true,
-	'$':  true,
-	'(':  true,
-	')':  true,
+	']': true,
 }
 
 type lexer struct {

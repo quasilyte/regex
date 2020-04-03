@@ -133,7 +133,11 @@ func (p *Parser) setValues(e *Expr) {
 	for i := range e.Args {
 		p.setValues(&e.Args[i])
 	}
-	e.Value = p.out.Pattern[e.Begin():e.End()]
+	e.Value = p.exprValue(e)
+}
+
+func (p *Parser) exprValue(e *Expr) string {
+	return p.out.Pattern[e.Begin():e.End()]
 }
 
 func (p *Parser) mergeChars(e *Expr) {
@@ -256,15 +260,27 @@ func (p *Parser) parseCharClass(op Operation, tok token) *Expr {
 }
 
 func (p *Parser) parseMinus(left *Expr, tok token) *Expr {
-	switch left.Op {
-	case OpEscapeMeta, OpChar:
-		if next := p.lexer.Peek().kind; next == tokChar || next == tokEscapeMeta || next == tokMinus {
+	if p.isValidCharRangeOperand(left) {
+		if p.lexer.Peek().kind != tokRbracket {
 			right := p.parseExpr(2)
 			return p.newExpr(OpCharRange, combinePos(left.Pos, right.Pos), left, right)
 		}
 	}
 	p.charClass = append(p.charClass, *left)
 	return p.newExpr(OpChar, tok.pos)
+}
+
+func (p *Parser) isValidCharRangeOperand(e *Expr) bool {
+	switch e.Op {
+	case OpEscapeMeta, OpChar:
+		return true
+	case OpEscape:
+		switch p.exprValue(e) {
+		case `\\`, `\|`, `\*`, `\+`, `\?`, `\.`, `\[`, `\^`, `\$`, `\(`, `\)`:
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Parser) parseQuestion(left *Expr, tok token) *Expr {

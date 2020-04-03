@@ -401,8 +401,10 @@ func TestParser(t *testing.T) {
 		{`[^[\[]a`, `{[^[ \[] a}`},
 
 		// Char class ranges.
+		// We parse a-\d and it's something that should be
+		// handled by post-parsing validator.
 		{`[\d-a]`, `[\d - a]`},
-		{`[a-\d]`, `[a - \d]`},
+		{`[a-\d]`, `[a-\d]`},
 		{`[\pL0-9]`, `[\pL 0-9]`},
 		{`[+--]`, `[+--]`},
 		{`[--+]`, `[--+]`},
