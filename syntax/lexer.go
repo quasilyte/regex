@@ -144,11 +144,17 @@ func (l *lexer) Init(s string) error {
 			pushMetaTok(tokDollar)
 		case '?':
 			pushMetaTok(tokQuestion)
+		case ')':
+			pushMetaTok(tokRparen)
+		case '|':
+			pushMetaTok(tokPipe)
 
 		case '(':
 			if insideCharClass {
 				pushTok(tokChar)
-			} else if l.byteAt(i+1) == '?' {
+				break
+			}
+			if l.byteAt(i+1) == '?' {
 				switch {
 				case l.byteAt(i+2) == '>':
 					size += len("?>")
@@ -182,10 +188,6 @@ func (l *lexer) Init(s string) error {
 			} else {
 				pushTok(tokLparen)
 			}
-		case ')':
-			pushMetaTok(tokRparen)
-		case '|':
-			pushMetaTok(tokPipe)
 
 		case '{':
 			if !insideCharClass {
