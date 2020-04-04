@@ -17,6 +17,7 @@ func TestLexer(t *testing.T) {
 		{`xxx`, `Char Concat Char Concat Char`},
 		{`..`, `. Concat .`},
 		{`.x.`, `. Concat Char Concat .`},
+		{`✓✓`, `Char Concat Char`},
 
 		{`x|x`, `Char | Char`},
 		{`x|x|x`, `Char | Char | Char`},

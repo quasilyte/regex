@@ -388,7 +388,7 @@ func (p *Parser) precedenceOf(tok token) int {
 }
 
 func (p *Parser) newPCRE(source string) (*RegexpPCRE, error) {
-	if len(source) == 0 {
+	if source == "" {
 		return nil, errors.New("empty pattern: can't find delimiters")
 	}
 

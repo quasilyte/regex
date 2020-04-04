@@ -105,233 +105,202 @@ func (l *lexer) Peek() token {
 	return token{}
 }
 
-func (l *lexer) Init(s string) error {
+func (l *lexer) scan() {
+	for l.pos < len(l.input) {
+		ch := l.input[l.pos]
+		if ch >= 128 {
+			_, size := utf8.DecodeRuneInString(l.input[l.pos:])
+			l.pushTok(tokChar, size)
+			l.maybeInsertConcat()
+			continue
+		}
+		switch ch {
+		case '\\':
+			l.scanEscape(false)
+		case '.':
+			l.pushTok(tokDot, 1)
+		case '+':
+			l.pushTok(tokPlus, 1)
+		case '*':
+			l.pushTok(tokStar, 1)
+		case '^':
+			l.pushTok(tokCaret, 1)
+		case '$':
+			l.pushTok(tokDollar, 1)
+		case '?':
+			l.pushTok(tokQuestion, 1)
+		case ')':
+			l.pushTok(tokRparen, 1)
+		case '|':
+			l.pushTok(tokPipe, 1)
+		case '[':
+			if l.byteAt(l.pos+1) == '^' {
+				l.pushTok(tokLbracketCaret, 2)
+			} else {
+				l.pushTok(tokLbracket, 1)
+			}
+			l.scanCharClass()
+		case '(':
+			if l.byteAt(l.pos+1) == '?' {
+				switch {
+				case l.byteAt(l.pos+2) == '>':
+					l.pushTok(tokLparenAtomic, len("(?>"))
+				case l.byteAt(l.pos+2) == '=':
+					l.pushTok(tokLparenPositiveLookahead, len("(?="))
+				case l.byteAt(l.pos+2) == '!':
+					l.pushTok(tokLparenNegativeLookahead, len("(?!"))
+				case l.byteAt(l.pos+2) == '<' && l.byteAt(l.pos+3) == '=':
+					l.pushTok(tokLparenPositiveLookbehind, len("(?<="))
+				case l.byteAt(l.pos+2) == '<' && l.byteAt(l.pos+3) == '!':
+					l.pushTok(tokLparenNegativeLookbehind, len("(?<!"))
+				default:
+					if j := l.commentWidth(l.pos + 1); j >= 0 {
+						l.pushTok(tokComment, len("(")+j)
+					} else if j = l.captureNameWidth(l.pos + 1); j >= 0 {
+						l.pushTok(tokLparenName, len("(")+j)
+					} else if j = l.groupFlagsWidth(l.pos + 1); j >= 0 {
+						l.pushTok(tokLparenFlags, len("(")+j)
+					} else {
+						throwErrorf(l.pos, l.pos+1, "group token is incomplete")
+					}
+				}
+			} else {
+				l.pushTok(tokLparen, 1)
+			}
+		case '{':
+			if j := l.repeatWidth(l.pos + 1); j >= 0 {
+				l.pushTok(tokRepeat, len("{")+j)
+			} else {
+				l.pushTok(tokChar, 1)
+			}
+		default:
+			l.pushTok(tokChar, 1)
+		}
+		l.maybeInsertConcat()
+	}
+}
+
+func (l *lexer) scanCharClass() {
+	l.maybeInsertConcat()
+	for l.pos < len(l.input) {
+		ch := l.input[l.pos]
+		if ch >= 128 {
+			_, size := utf8.DecodeRuneInString(l.input[l.pos:])
+			l.pushTok(tokChar, size)
+			continue
+		}
+		switch ch {
+		case '\\':
+			l.scanEscape(true)
+		case '[':
+			isPosixClass := false
+			if l.byteAt(l.pos+1) == ':' {
+				j := l.stringIndex(l.pos+2, ":]")
+				if j >= 0 {
+					isPosixClass = true
+					l.pushTok(tokPosixClass, j+len("[::]"))
+				}
+			}
+			if !isPosixClass {
+				l.pushTok(tokChar, 1)
+			}
+		case '-':
+			l.pushTok(tokMinus, 1)
+		case ']':
+			l.pushTok(tokRbracket, 1)
+			return // Stop scanning in the char context
+		default:
+			l.pushTok(tokChar, 1)
+		}
+	}
+}
+
+func (l *lexer) scanEscape(insideCharClass bool) {
+	s := l.input
+	if l.pos+1 >= len(s) {
+		throwErrorf(l.pos, l.pos+1, `unexpected end of pattern: trailing '\'`)
+	}
+	switch {
+	case s[l.pos+1] == 'p' || s[l.pos+1] == 'P':
+		if l.pos+2 >= len(s) {
+			throwErrorf(l.pos, l.pos+2, "unexpected end of pattern: expected uni-class-short or '{'")
+		}
+		if s[l.pos+2] == '{' {
+			j := strings.IndexByte(s[l.pos+2:], '}')
+			if j < 0 {
+				throwErrorf(l.pos, l.pos+2, "can't find closing '}'")
+			}
+			l.pushTok(tokEscapeUniFull, len(`\p{`)+j)
+		} else {
+			l.pushTok(tokEscapeUni, len(`\pL`))
+		}
+	case s[l.pos+1] == 'x':
+		if l.pos+2 >= len(s) {
+			throwErrorf(l.pos, l.pos+2, "unexpected end of pattern: expected hex-digit or '{'")
+		}
+		if s[l.pos+2] == '{' {
+			j := strings.IndexByte(s[l.pos+2:], '}')
+			if j < 0 {
+				throwErrorf(l.pos, l.pos+2, "can't find closing '}'")
+			}
+			l.pushTok(tokEscapeHexFull, len(`\x{`)+j)
+		} else {
+			if isHexDigit(l.byteAt(l.pos + 3)) {
+				l.pushTok(tokEscapeHex, len(`\xFF`))
+			} else {
+				l.pushTok(tokEscapeHex, len(`\xF`))
+			}
+		}
+	case isOctalDigit(s[l.pos+1]):
+		digits := 1
+		if isOctalDigit(l.byteAt(l.pos + 2)) {
+			if isOctalDigit(l.byteAt(l.pos + 3)) {
+				digits = 3
+			} else {
+				digits = 2
+			}
+		}
+		l.pushTok(tokEscapeOctal, len(`\`)+digits)
+	case s[l.pos+1] == 'Q':
+		size := len(s) - l.pos // Until the pattern ends
+		j := l.stringIndex(l.pos+2, `\E`)
+		if j >= 0 {
+			size = j + len(`\Q\E`)
+		}
+		l.pushTok(tokQ, size)
+
+	default:
+		kind := tokEscape
+		if insideCharClass {
+			if charClassMetachar[l.byteAt(l.pos+1)] {
+				kind = tokEscapeMeta
+			}
+		} else {
+			if reMetachar[l.byteAt(l.pos+1)] {
+				kind = tokEscapeMeta
+			}
+		}
+		l.pushTok(kind, 2)
+	}
+}
+
+func (l *lexer) maybeInsertConcat() {
+	if l.isConcatPos() {
+		last := len(l.tokens) - 1
+		tok := l.tokens[last]
+		l.tokens[last].kind = tokConcat
+		l.tokens = append(l.tokens, tok)
+	}
+}
+
+func (l *lexer) Init(s string) {
 	l.pos = 0
 	l.tokens = l.tokens[:0]
 	l.input = s
 
-	i := 0
-	size := 0
-	insideCharClass := false
-	pushTok := func(kind tokenKind) {
-		l.tokens = append(l.tokens, token{
-			kind: kind,
-			pos:  Position{Begin: uint16(i), End: uint16(i + size)},
-		})
-	}
-	pushMetaTok := func(kind tokenKind) {
-		if insideCharClass {
-			pushTok(tokChar)
-		} else {
-			pushTok(kind)
-		}
-	}
+	l.scan()
 
-	for i < len(s) {
-		var ch rune
-		ch, size = utf8.DecodeRuneInString(s[i:])
-
-		switch ch {
-		case '.':
-			pushMetaTok(tokDot)
-		case '+':
-			pushMetaTok(tokPlus)
-		case '*':
-			pushMetaTok(tokStar)
-		case '^':
-			pushMetaTok(tokCaret)
-		case '$':
-			pushMetaTok(tokDollar)
-		case '?':
-			pushMetaTok(tokQuestion)
-		case ')':
-			pushMetaTok(tokRparen)
-		case '|':
-			pushMetaTok(tokPipe)
-
-		case '(':
-			if insideCharClass {
-				pushTok(tokChar)
-				break
-			}
-			if l.byteAt(i+1) == '?' {
-				switch {
-				case l.byteAt(i+2) == '>':
-					size += len("?>")
-					pushTok(tokLparenAtomic)
-				case l.byteAt(i+2) == '=':
-					size += len("?=")
-					pushTok(tokLparenPositiveLookahead)
-				case l.byteAt(i+2) == '!':
-					size += len("?!")
-					pushTok(tokLparenNegativeLookahead)
-				case l.byteAt(i+2) == '<' && l.byteAt(i+3) == '=':
-					size += len("?<=")
-					pushTok(tokLparenPositiveLookbehind)
-				case l.byteAt(i+2) == '<' && l.byteAt(i+3) == '!':
-					size += len("?<!")
-					pushTok(tokLparenNegativeLookbehind)
-				default:
-					if j := l.commentWidth(i + 1); j >= 0 {
-						size += j
-						pushTok(tokComment)
-					} else if j = l.captureNameWidth(i + 1); j >= 0 {
-						size += j
-						pushTok(tokLparenName)
-					} else if j = l.groupFlagsWidth(i + 1); j >= 0 {
-						size += j
-						pushTok(tokLparenFlags)
-					} else {
-						throwErrorf(i, i+1, "group token is incomplete")
-					}
-				}
-			} else {
-				pushTok(tokLparen)
-			}
-
-		case '{':
-			if !insideCharClass {
-				j := l.repeatWidth(i + 1)
-				if j >= 0 {
-					size += j
-					pushTok(tokRepeat)
-					break
-				}
-			}
-			pushTok(tokChar)
-
-		case '-':
-			if insideCharClass {
-				pushTok(tokMinus)
-			} else {
-				pushTok(tokChar)
-			}
-		case '[':
-			if insideCharClass {
-				isPosixClass := false
-				if l.byteAt(i+1) == ':' && i+2 < len(s) {
-					j := strings.Index(s[i+2:], ":]")
-					if j >= 0 {
-						isPosixClass = true
-						size += j + len(":") + len(":]")
-						pushTok(tokPosixClass)
-					}
-				}
-				if !isPosixClass {
-					pushTok(tokChar)
-				}
-			} else {
-				if l.byteAt(i+1) == '^' {
-					size++
-					pushTok(tokLbracketCaret)
-				} else {
-					pushTok(tokLbracket)
-				}
-			}
-		case ']':
-			if insideCharClass {
-				pushTok(tokRbracket)
-			} else {
-				pushTok(tokChar)
-			}
-
-		case '\\':
-			if i+1 >= len(s) {
-				throwErrorf(i, i+1, `unexpected end of pattern: trailing '\'`)
-			}
-			switch {
-			case s[i+1] == 'p' || s[i+1] == 'P':
-				if i+2 >= len(s) {
-					throwErrorf(i, i+2, "unexpected end of pattern: expected uni-class-short or '{'")
-				}
-				if s[i+2] == '{' {
-					j := strings.IndexByte(s[i+2:], '}')
-					if j < 0 {
-						throwErrorf(i, i+2, "can't find closing '}'")
-					}
-					size += j + len("p{")
-					pushTok(tokEscapeUniFull)
-				} else {
-					size += 2
-					pushTok(tokEscapeUni)
-				}
-			case s[i+1] == 'x':
-				if i+2 >= len(s) {
-					throwErrorf(i, i+2, "unexpected end of pattern: expected hex-digit or '{'")
-				}
-				if s[i+2] == '{' {
-					j := strings.IndexByte(s[i+2:], '}')
-					if j < 0 {
-						throwErrorf(i, i+2, "can't find closing '}'")
-					}
-					size += j + len("x{")
-					pushTok(tokEscapeHexFull)
-				} else {
-					if isHexDigit(l.byteAt(i + 3)) {
-						size += 3
-					} else {
-						size += 2
-					}
-					pushTok(tokEscapeHex)
-				}
-			case isOctalDigit(s[i+1]):
-				size++
-				if isOctalDigit(l.byteAt(i + 2)) {
-					size++
-				}
-				if isOctalDigit(l.byteAt(i + 3)) {
-					size++
-				}
-				pushTok(tokEscapeOctal)
-			case s[i+1] == 'Q':
-				j := -1
-				if i+2 < len(s) {
-					j = strings.Index(s[i+2:], `\E`)
-				}
-				if j == -1 {
-					size = len(s) - i
-				} else {
-					size = j + len(`\Q\E`)
-				}
-				pushTok(tokQ)
-
-			default:
-				size++
-				kind := tokEscape
-				if insideCharClass {
-					if charClassMetachar[l.byteAt(i+1)] {
-						kind = tokEscapeMeta
-					}
-				} else {
-					if reMetachar[l.byteAt(i+1)] {
-						kind = tokEscapeMeta
-					}
-				}
-				pushTok(kind)
-			}
-
-		default:
-			pushTok(tokChar)
-		}
-
-		if !insideCharClass && l.isConcatPos() {
-			last := len(l.tokens) - 1
-			tok := l.tokens[last]
-			l.tokens[last].kind = tokConcat
-			l.tokens = append(l.tokens, tok)
-		}
-
-		switch {
-		case ch == '[':
-			insideCharClass = true
-		case ch == ']':
-			insideCharClass = false
-		}
-
-		i += size
-	}
-
-	return nil
+	l.pos = 0
 }
 
 func (l *lexer) captureNameWidth(pos int) int {
@@ -395,11 +364,26 @@ func (l *lexer) repeatWidth(pos int) int {
 	return -1
 }
 
+func (l *lexer) stringIndex(offset int, s string) int {
+	if offset < len(l.input) {
+		return strings.Index(l.input[offset:], s)
+	}
+	return -1
+}
+
 func (l *lexer) byteAt(pos int) byte {
 	if pos >= 0 && pos < len(l.input) {
 		return l.input[pos]
 	}
 	return 0
+}
+
+func (l *lexer) pushTok(kind tokenKind, size int) {
+	l.tokens = append(l.tokens, token{
+		kind: kind,
+		pos:  Position{Begin: uint16(l.pos), End: uint16(l.pos + size)},
+	})
+	l.pos += size
 }
 
 func (l *lexer) isConcatPos() bool {
