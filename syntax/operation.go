@@ -40,6 +40,11 @@ const (
 	// Args[0] - quantified expression
 	OpNonGreedy
 
+	// OpPossessive makes its operand quantifier possessive.
+	// Examples: `x?+` `x*+` `x++`
+	// Args[0] - quantified expression
+	OpPossessive
+
 	// OpCaret is ^ anchor.
 	OpCaret
 

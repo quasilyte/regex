@@ -139,13 +139,13 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 			}
 		}
 
-	case OpNonGreedy, OpQuestion, OpPlus, OpStar:
+	case OpNonGreedy, OpPossessive, OpQuestion, OpPlus, OpStar:
 		assertEndPos(e, e.Args[0].End()+1)
 		writeExpr(t, w, re, e.Args[0])
 		switch e.Op {
 		case OpNonGreedy, OpQuestion:
 			w.WriteByte('?')
-		case OpPlus:
+		case OpPossessive, OpPlus:
 			w.WriteByte('+')
 		case OpStar:
 			w.WriteByte('*')
@@ -167,7 +167,8 @@ func TestWriteExpr(t *testing.T) {
 		o2  Operation
 	}{
 		{pat: `$`, o1: OpDollar},
-		{pat: `abc`, o1: OpLiteral},
+		{pat: `(foobar|baz)*+`, o1: OpPossessive},
+		{pat: `abc?+`, o1: OpLiteral, o2: OpPossessive},
 		{pat: `x{0}`, o1: OpChar, o2: OpString},
 		{pat: `a\x{BAD}`, o1: OpLiteral, o2: OpEscapeHexFull},
 		{pat: `(✓x✓x)`, o1: OpLiteral, o2: OpCapture},
@@ -336,6 +337,10 @@ func TestParser(t *testing.T) {
 		{`x+?|y+?`, `(or (non-greedy (+ x)) (non-greedy (+ y)))`},
 		{`x*?|y*?`, `(or (non-greedy (* x)) (non-greedy (* y)))`},
 		{`x??|y??`, `(or (non-greedy (? x)) (non-greedy (? y)))`},
+
+		// Possessive modifiers.
+		{`x++|x*+`, `(or (possessive (+ x)) (possessive (* x)))`},
+		{`[ab]?+|x{2,}+`, `(or (possessive (? [a b])) (possessive (repeat x {2,})))`},
 
 		// Escapes and escape chars.
 		{`\d\d+`, `{\d (+ \d)}`},

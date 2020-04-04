@@ -115,6 +115,8 @@ func formatExprSyntax(re *Regexp, e Expr) string {
 		return fmt.Sprintf("(? %s)", formatExprSyntax(re, e.Args[0]))
 	case OpNonGreedy:
 		return fmt.Sprintf("(non-greedy %s)", formatExprSyntax(re, e.Args[0]))
+	case OpPossessive:
+		return fmt.Sprintf("(possessive %s)", formatExprSyntax(re, e.Args[0]))
 	default:
 		return fmt.Sprintf("<op=%d>", e.Op)
 	}

@@ -47,9 +47,6 @@ func NewParser(opts *ParserOptions) *Parser {
 		repeatLit := p.newExpr(OpString, tok.pos)
 		return p.newExpr(OpRepeat, combinePos(left.Pos, tok.pos), left, repeatLit)
 	}
-	p.infixParselets[tokPlus] = func(left *Expr, tok token) *Expr {
-		return p.newExpr(OpPlus, tok.pos, left)
-	}
 	p.infixParselets[tokStar] = func(left *Expr, tok token) *Expr {
 		return p.newExpr(OpStar, tok.pos, left)
 	}
@@ -64,6 +61,7 @@ func NewParser(opts *ParserOptions) *Parser {
 	}
 	p.infixParselets[tokPipe] = p.parseAlt
 	p.infixParselets[tokMinus] = p.parseMinus
+	p.infixParselets[tokPlus] = p.parsePlus
 	p.infixParselets[tokQuestion] = p.parseQuestion
 
 	return &p
@@ -284,6 +282,15 @@ func (p *Parser) isValidCharRangeOperand(e *Expr) bool {
 		}
 	}
 	return false
+}
+
+func (p *Parser) parsePlus(left *Expr, tok token) *Expr {
+	op := OpPlus
+	switch left.Op {
+	case OpPlus, OpStar, OpQuestion, OpRepeat:
+		op = OpPossessive
+	}
+	return p.newExpr(op, tok.pos, left)
 }
 
 func (p *Parser) parseQuestion(left *Expr, tok token) *Expr {
