@@ -13,7 +13,10 @@ There are several problems with the stdlib [regexp/syntax](https://golang.org/pk
    execution inside the [regexp](https://golang.org/pkg/regexp) package.
    It's somewhat complicated, especially in a way character ranges are encoded.
 
-3. It's easier to extend this package than something from the standard library.
+3. It only supports [re2](https://github.com/google/re2/wiki/Syntax) syntax.
+   This parser recognizes most PCRE operations.
+
+4. It's easier to extend this package than something from the standard library.
 
 This package does almost no assumptions about how generated AST is going to be used
 so it preserves as much syntax information as possible.
