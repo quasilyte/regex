@@ -37,6 +37,21 @@ func TestLexer(t *testing.T) {
 		{`a(?P<foo>x)b`, `Char Concat (?P<name> Char ) Concat Char`},
 		{`a(?P<foo>xy)b`, `Char Concat (?P<name> Char Concat Char ) Concat Char`},
 
+		{`(?#)`, `Comment`},
+		{`a(?#test)(?#c2)b`, `Char Concat Comment Concat Comment Concat Char`},
+
+		{`(?>)`, `(?> )`},
+		{`a(?>xy)(?>z)`, `Char Concat (?> Char Concat Char ) Concat (?> Char )`},
+
+		{`(?=)`, `(?= )`},
+		{`(?!)`, `(?! )`},
+		{`(?<=)`, `(?<= )`},
+		{`(?<!)`, `(?<! )`},
+		{`a(?=xy)(?=z)`, `Char Concat (?= Char Concat Char ) Concat (?= Char )`},
+		{`a(?!xy)(?!z)`, `Char Concat (?! Char Concat Char ) Concat (?! Char )`},
+		{`a(?<=xy)(?<=z)`, `Char Concat (?<= Char Concat Char ) Concat (?<= Char )`},
+		{`a(?<!xy)(?<!z)`, `Char Concat (?<! Char Concat Char ) Concat (?<! Char )`},
+
 		{`(?i)`, `(?flags )`},
 		{`(?im)`, `(?flags )`},
 		{`(?i-m)`, `(?flags )`},

@@ -145,10 +145,39 @@ const (
 	// Args[1] - flags (OpString)
 	OpGroupWithFlags
 
+	// OpAtomicGroup is `(?>re)` non-capturing group without backtracking.
+	// Examples: `(?>foo)` `(?>)`
+	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
+	OpAtomicGroup
+
+	// OpPositiveLookahead is `(?=re)` asserts that following text matches re.
+	// Examples: `(?=foo)`
+	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
+	OpPositiveLookahead
+
+	// OpNegativeLookahead is `(?!re)` asserts that following text doesn't match re.
+	// Examples: `(?!foo)`
+	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
+	OpNegativeLookahead
+
+	// OpPositiveLookbehind is `(?<=re)` asserts that preceding text matches re.
+	// Examples: `(?<=foo)`
+	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
+	OpPositiveLookbehind
+
+	// OpNegativeLookbehind is `(?=re)` asserts that preceding text doesn't match re.
+	// Examples: `(?<!foo)`
+	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
+	OpNegativeLookbehind
+
 	// OpFlagOnlyGroup is `(?flags)` form that affects current group flags.
 	// Examples: `(?i)` `(?i-m)` `(?-im)`
 	// Args[0] - flags (OpString)
 	OpFlagOnlyGroup
+
+	// OpComment is a group-like regexp comment expression.
+	// Examples: `(?#text)` `(?#)`
+	OpComment
 
 	// OpNone2 is a sentinel value that is never part of the AST.
 	// OpNone and OpNone2 can be used to cover all ops in a range.

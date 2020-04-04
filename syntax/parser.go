@@ -25,9 +25,13 @@ func NewParser(opts *ParserOptions) *Parser {
 		}
 	}
 
-	// TODO: can we handle group parsing in a more elegant way?
+	p.prefixParselets[tokLparen] = func(tok token) *Expr { return p.parseGroup(OpCapture, tok) }
+	p.prefixParselets[tokLparenAtomic] = func(tok token) *Expr { return p.parseGroup(OpAtomicGroup, tok) }
+	p.prefixParselets[tokLparenPositiveLookahead] = func(tok token) *Expr { return p.parseGroup(OpPositiveLookahead, tok) }
+	p.prefixParselets[tokLparenNegativeLookahead] = func(tok token) *Expr { return p.parseGroup(OpNegativeLookahead, tok) }
+	p.prefixParselets[tokLparenPositiveLookbehind] = func(tok token) *Expr { return p.parseGroup(OpPositiveLookbehind, tok) }
+	p.prefixParselets[tokLparenNegativeLookbehind] = func(tok token) *Expr { return p.parseGroup(OpNegativeLookbehind, tok) }
 
-	p.prefixParselets[tokLparen] = p.parseCapture
 	p.prefixParselets[tokLparenName] = p.parseNamedCapture
 	p.prefixParselets[tokLparenFlags] = p.parseGroupWithFlags
 
@@ -327,9 +331,9 @@ func (p *Parser) parseGroupItem(tok token) *Expr {
 	return p.parseExpr(0)
 }
 
-func (p *Parser) parseCapture(tok token) *Expr {
+func (p *Parser) parseGroup(op Operation, tok token) *Expr {
 	x := p.parseGroupItem(tok)
-	result := p.newExpr(OpCapture, tok.pos, x)
+	result := p.newExpr(op, tok.pos, x)
 	result.Pos.End = p.expect(tokRparen).End
 	return result
 }
@@ -439,4 +443,5 @@ var tok2op = [256]Operation{
 	tokEscapeUniFull: OpEscapeUniFull,
 	tokPosixClass:    OpPosixClass,
 	tokQ:             OpQuote,
+	tokComment:       OpComment,
 }

@@ -103,10 +103,20 @@ func formatExprSyntax(re *Regexp, e Expr) string {
 		return fmt.Sprintf("(capture %s %s)", formatExprSyntax(re, e.Args[0]), e.Args[1].Value)
 	case OpGroup:
 		return fmt.Sprintf("(group %s)", formatExprSyntax(re, e.Args[0]))
+	case OpAtomicGroup:
+		return fmt.Sprintf("(atomic %s)", formatExprSyntax(re, e.Args[0]))
 	case OpGroupWithFlags:
 		return fmt.Sprintf("(group %s %s)", formatExprSyntax(re, e.Args[0]), e.Args[1].Value)
 	case OpFlagOnlyGroup:
 		return fmt.Sprintf("(flags %s)", formatExprSyntax(re, e.Args[0]))
+	case OpPositiveLookahead:
+		return fmt.Sprintf("(?= %s)", formatExprSyntax(re, e.Args[0]))
+	case OpNegativeLookahead:
+		return fmt.Sprintf("(?! %s)", formatExprSyntax(re, e.Args[0]))
+	case OpPositiveLookbehind:
+		return fmt.Sprintf("(?<= %s)", formatExprSyntax(re, e.Args[0]))
+	case OpNegativeLookbehind:
+		return fmt.Sprintf("(?<! %s)", formatExprSyntax(re, e.Args[0]))
 	case OpPlus:
 		return fmt.Sprintf("(+ %s)", formatExprSyntax(re, e.Args[0]))
 	case OpStar:
@@ -117,6 +127,8 @@ func formatExprSyntax(re *Regexp, e Expr) string {
 		return fmt.Sprintf("(non-greedy %s)", formatExprSyntax(re, e.Args[0]))
 	case OpPossessive:
 		return fmt.Sprintf("(possessive %s)", formatExprSyntax(re, e.Args[0]))
+	case OpComment:
+		return fmt.Sprintf("/*%s*/", e.Value)
 	default:
 		return fmt.Sprintf("<op=%d>", e.Op)
 	}

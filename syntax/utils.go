@@ -14,3 +14,17 @@ func isAlphanumeric(ch byte) bool {
 		(ch >= 'A' && ch <= 'Z') ||
 		(ch >= '0' && ch <= '9')
 }
+
+func isDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9'
+}
+
+func isOctalDigit(ch byte) bool {
+	return ch >= '0' && ch <= '7'
+}
+
+func isHexDigit(ch byte) bool {
+	return (ch >= '0' && ch <= '9') ||
+		(ch >= 'a' && ch <= 'f') ||
+		(ch >= 'A' && ch <= 'F')
+}

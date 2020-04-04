@@ -39,13 +39,19 @@ func _() {
 	_ = x[OpNamedCapture-28]
 	_ = x[OpGroup-29]
 	_ = x[OpGroupWithFlags-30]
-	_ = x[OpFlagOnlyGroup-31]
-	_ = x[OpNone2-32]
+	_ = x[OpAtomicGroup-31]
+	_ = x[OpPositiveLookahead-32]
+	_ = x[OpNegativeLookahead-33]
+	_ = x[OpPositiveLookbehind-34]
+	_ = x[OpNegativeLookbehind-35]
+	_ = x[OpFlagOnlyGroup-36]
+	_ = x[OpComment-37]
+	_ = x[OpNone2-38]
 }
 
-const _Operation_name = "NoneConcatDotAltStarPlusQuestionNonGreedyPossessiveCaretDollarLiteralCharStringQuoteEscapeEscapeMetaEscapeOctalEscapeHexEscapeHexFullEscapeUniEscapeUniFullCharClassNegCharClassCharRangePosixClassRepeatCaptureNamedCaptureGroupGroupWithFlagsFlagOnlyGroupNone2"
+const _Operation_name = "NoneConcatDotAltStarPlusQuestionNonGreedyPossessiveCaretDollarLiteralCharStringQuoteEscapeEscapeMetaEscapeOctalEscapeHexEscapeHexFullEscapeUniEscapeUniFullCharClassNegCharClassCharRangePosixClassRepeatCaptureNamedCaptureGroupGroupWithFlagsAtomicGroupPositiveLookaheadNegativeLookaheadPositiveLookbehindNegativeLookbehindFlagOnlyGroupCommentNone2"
 
-var _Operation_index = [...]uint16{0, 4, 10, 13, 16, 20, 24, 32, 41, 51, 56, 62, 69, 73, 79, 84, 90, 100, 111, 120, 133, 142, 155, 164, 176, 185, 195, 201, 208, 220, 225, 239, 252, 257}
+var _Operation_index = [...]uint16{0, 4, 10, 13, 16, 20, 24, 32, 41, 51, 56, 62, 69, 73, 79, 84, 90, 100, 111, 120, 133, 142, 155, 164, 176, 185, 195, 201, 208, 220, 225, 239, 250, 267, 284, 302, 320, 333, 340, 345}
 
 func (i Operation) String() string {
 	if i >= Operation(len(_Operation_index)-1) {

@@ -32,23 +32,29 @@ const (
 	tokEscapeUniFull
 	tokEscapeHex
 	tokEscapeHexFull
+	tokComment
 
-	tokQ             // \Q
-	tokMinus         // -
-	tokLbracket      // [
-	tokLbracketCaret // [^
-	tokRbracket      // ]
-	tokDollar        // $
-	tokCaret         // ^
-	tokQuestion      // ?
-	tokDot           // .
-	tokPlus          // +
-	tokStar          // *
-	tokPipe          // |
-	tokLparen        // (
-	tokLparenName    // (?P<name>
-	tokLparenFlags   // (?flags
-	tokRparen        // )
+	tokQ                        // \Q
+	tokMinus                    // -
+	tokLbracket                 // [
+	tokLbracketCaret            // [^
+	tokRbracket                 // ]
+	tokDollar                   // $
+	tokCaret                    // ^
+	tokQuestion                 // ?
+	tokDot                      // .
+	tokPlus                     // +
+	tokStar                     // *
+	tokPipe                     // |
+	tokLparen                   // (
+	tokLparenName               // (?P<name>
+	tokLparenFlags              // (?flags
+	tokLparenAtomic             // (?>
+	tokLparenPositiveLookahead  // (?=
+	tokLparenPositiveLookbehind // (?<=
+	tokLparenNegativeLookahead  // (?!
+	tokLparenNegativeLookbehind // (?<!
+	tokRparen                   // )
 )
 
 // reMetachar is a table of meta chars outside of a char class.
@@ -142,16 +148,39 @@ func (l *lexer) Init(s string) error {
 		case '(':
 			if insideCharClass {
 				pushTok(tokChar)
-			} else {
-				if j := l.captureNameWidth(i + 1); j >= 0 {
-					size += j
-					pushTok(tokLparenName)
-				} else if j = l.groupFlagsWidth(i + 1); j >= 0 {
-					size += j
-					pushTok(tokLparenFlags)
-				} else {
-					pushTok(tokLparen)
+			} else if l.byteAt(i+1) == '?' {
+				switch {
+				case l.byteAt(i+2) == '>':
+					size += len("?>")
+					pushTok(tokLparenAtomic)
+				case l.byteAt(i+2) == '=':
+					size += len("?=")
+					pushTok(tokLparenPositiveLookahead)
+				case l.byteAt(i+2) == '!':
+					size += len("?!")
+					pushTok(tokLparenNegativeLookahead)
+				case l.byteAt(i+2) == '<' && l.byteAt(i+3) == '=':
+					size += len("?<=")
+					pushTok(tokLparenPositiveLookbehind)
+				case l.byteAt(i+2) == '<' && l.byteAt(i+3) == '!':
+					size += len("?<!")
+					pushTok(tokLparenNegativeLookbehind)
+				default:
+					if j := l.commentWidth(i + 1); j >= 0 {
+						size += j
+						pushTok(tokComment)
+					} else if j = l.captureNameWidth(i + 1); j >= 0 {
+						size += j
+						pushTok(tokLparenName)
+					} else if j = l.groupFlagsWidth(i + 1); j >= 0 {
+						size += j
+						pushTok(tokLparenFlags)
+					} else {
+						throwErrorf(i, i+1, "group token is incomplete")
+					}
 				}
+			} else {
+				pushTok(tokLparen)
 			}
 		case ')':
 			pushMetaTok(tokRparen)
@@ -236,19 +265,19 @@ func (l *lexer) Init(s string) error {
 					size += j + len("x{")
 					pushTok(tokEscapeHexFull)
 				} else {
-					if l.isHexDigit(l.byteAt(i + 3)) {
+					if isHexDigit(l.byteAt(i + 3)) {
 						size += 3
 					} else {
 						size += 2
 					}
 					pushTok(tokEscapeHex)
 				}
-			case l.isOctalDigit(s[i+1]):
+			case isOctalDigit(s[i+1]):
 				size++
-				if l.isOctalDigit(l.byteAt(i + 2)) {
+				if isOctalDigit(l.byteAt(i + 2)) {
 					size++
 				}
-				if l.isOctalDigit(l.byteAt(i + 3)) {
+				if isOctalDigit(l.byteAt(i + 3)) {
 					size++
 				}
 				pushTok(tokEscapeOctal)
@@ -329,9 +358,20 @@ func (l *lexer) groupFlagsWidth(pos int) int {
 	return parenPos
 }
 
+func (l *lexer) commentWidth(pos int) int {
+	if l.byteAt(pos) != '?' || l.byteAt(pos+1) != '#' {
+		return -1
+	}
+	parenPos := strings.IndexByte(l.input[pos:], ')')
+	if parenPos < 0 {
+		return -1
+	}
+	return parenPos + len(`)`)
+}
+
 func (l *lexer) repeatWidth(pos int) int {
 	j := pos
-	for l.isDigit(l.byteAt(j)) {
+	for isDigit(l.byteAt(j)) {
 		j++
 	}
 	if j == pos {
@@ -344,7 +384,7 @@ func (l *lexer) repeatWidth(pos int) int {
 		return -1
 	}
 	j += len(",")
-	for l.isDigit(l.byteAt(j)) {
+	for isDigit(l.byteAt(j)) {
 		j++
 	}
 	if l.byteAt(j) == '}' {
@@ -360,37 +400,40 @@ func (l *lexer) byteAt(pos int) byte {
 	return 0
 }
 
-func (l *lexer) isDigit(ch byte) bool {
-	return ch >= '0' && ch <= '9'
-}
-
-func (l *lexer) isOctalDigit(ch byte) bool {
-	return ch >= '0' && ch <= '7'
-}
-
-func (l *lexer) isHexDigit(ch byte) bool {
-	return (ch >= '0' && ch <= '9') ||
-		(ch >= 'a' && ch <= 'f') ||
-		(ch >= 'A' && ch <= 'F')
-}
-
 func (l *lexer) isConcatPos() bool {
 	if len(l.tokens) < 2 {
 		return false
 	}
-
-	// TODO: find a better way to find a concat pos.
-
 	x := l.tokens[len(l.tokens)-2].kind
-	y := l.tokens[len(l.tokens)-1].kind
-	switch {
-	case x == tokLparen || x == tokLparenFlags || x == tokLparenName || x == tokLbracket:
+	if concatTable[x]&concatX != 0 {
 		return false
-	case x == tokPipe || y == tokPipe:
-		return false
-	case y == tokRparen || y == tokRbracket || y == tokPlus || y == tokStar || y == tokQuestion || y == tokRepeat:
-		return false
-	default:
-		return true
 	}
+	y := l.tokens[len(l.tokens)-1].kind
+	return concatTable[y]&concatY == 0
+}
+
+const (
+	concatX byte = 1 << iota
+	concatY
+)
+
+var concatTable = [256]byte{
+	tokPipe: concatX | concatY,
+
+	tokLparen:                   concatX,
+	tokLparenFlags:              concatX,
+	tokLparenName:               concatX,
+	tokLparenAtomic:             concatX,
+	tokLbracket:                 concatX,
+	tokLparenPositiveLookahead:  concatX,
+	tokLparenPositiveLookbehind: concatX,
+	tokLparenNegativeLookahead:  concatX,
+	tokLparenNegativeLookbehind: concatX,
+
+	tokRparen:   concatY,
+	tokRbracket: concatY,
+	tokPlus:     concatY,
+	tokStar:     concatY,
+	tokQuestion: concatY,
+	tokRepeat:   concatY,
 }

@@ -57,7 +57,7 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 	case OpChar, OpString, OpQuote, OpPosixClass,
 		OpEscape, OpEscapeMeta, OpEscapeUni, OpEscapeUniFull,
 		OpEscapeHex, OpEscapeHexFull, OpEscapeOctal,
-		OpDot, OpCaret, OpDollar:
+		OpDot, OpCaret, OpDollar, OpComment:
 		w.WriteString(e.Value)
 
 	case OpLiteral:
@@ -94,11 +94,22 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
 
-	case OpCapture, OpGroup:
+	case OpCapture, OpGroup, OpAtomicGroup, OpPositiveLookahead, OpNegativeLookahead, OpPositiveLookbehind, OpNegativeLookbehind:
 		assertEndPos(e, e.Args[0].End()+1)
 		w.WriteByte('(')
-		if e.Op == OpGroup {
+		switch e.Op {
+		case OpGroup:
 			w.WriteString("?:")
+		case OpAtomicGroup:
+			w.WriteString("?>")
+		case OpPositiveLookahead:
+			w.WriteString("?=")
+		case OpNegativeLookahead:
+			w.WriteString("?!")
+		case OpPositiveLookbehind:
+			w.WriteString("?<=")
+		case OpNegativeLookbehind:
+			w.WriteString("?<!")
 		}
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
@@ -166,8 +177,8 @@ func TestWriteExpr(t *testing.T) {
 		o1  Operation
 		o2  Operation
 	}{
-		{pat: `$`, o1: OpDollar},
-		{pat: `(foobar|baz)*+`, o1: OpPossessive},
+		{pat: `(?#?#)$`, o1: OpDollar, o2: OpComment},
+		{pat: `(foobar|baz)*+(?#the comment)`, o1: OpPossessive, o2: OpComment},
 		{pat: `abc?+`, o1: OpLiteral, o2: OpPossessive},
 		{pat: `x{0}`, o1: OpChar, o2: OpString},
 		{pat: `a\x{BAD}`, o1: OpLiteral, o2: OpEscapeHexFull},
@@ -200,9 +211,12 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `(?i)f.o`, o1: OpFlagOnlyGroup, o2: OpDot},
 		{pat: `(?:(?i)[^a-z]o)`, o1: OpFlagOnlyGroup, o2: OpNegCharClass},
 		{pat: `(?:(?P<foo>x))`, o1: OpString, o2: OpChar},
-
-		{pat: `\s*\{weight=(\d+)\}\s*`},
-		{pat: `[.?,!;:@#$%^&*()]+`},
+		{pat: `(?>atomic){2}.(?=x)`, o1: OpAtomicGroup, o2: OpPositiveLookahead},
+		{pat: `(?:(?>g2)g1(?=))`, o1: OpAtomicGroup, o2: OpPositiveLookahead},
+		{pat: `(?<=a)|(<!)`, o1: OpPositiveLookbehind, o2: OpNegativeLookbehind},
+		{pat: `(?<=)|(<!a)`, o1: OpPositiveLookbehind, o2: OpNegativeLookbehind},
+		{pat: `\s*\{weight=(\d+)\}\s(?!\s)*`, o1: OpNegativeLookahead},
+		{pat: `(?!x)[.?,!;:@#$%^&*()]+`, o1: OpNegativeLookahead},
 		{pat: `--(?P<var_name>[\\w-]+?):\\s+?(?P<var_val>.+?);`},
 		{pat: `^ *(#{1,6}) *([^\n]+?) *#* *(?:\n|$)`},
 		{pat: `^4\d{12}(\d{3})?$`},
@@ -323,6 +337,14 @@ func TestParser(t *testing.T) {
 		{`x(?P<name>.)y`, `{x (capture . name) y}`},
 		{`x(?P<1>ab)y`, `{x (capture {a b} 1) y}`},
 
+		// Atomic groups. PCRE-only.
+		{`(?>)`, `(atomic {})`},
+		{`(?>foo)`, `(atomic foo)`},
+
+		// Comments. PCRE-only.
+		{`a(?#)b`, `{a /*(?#)*/ b}`},
+		{`a(?#foo\)b`, `{a /*(?#foo\)*/ b}`},
+
 		// Quantifiers.
 		{`x+`, `(+ x)`},
 		{`x+|y+`, `(or (+ x) (+ y))`},
@@ -338,13 +360,14 @@ func TestParser(t *testing.T) {
 		{`x*?|y*?`, `(or (non-greedy (* x)) (non-greedy (* y)))`},
 		{`x??|y??`, `(or (non-greedy (? x)) (non-greedy (? y)))`},
 
-		// Possessive modifiers.
+		// Possessive modifiers. PCRE-only.
 		{`x++|x*+`, `(or (possessive (+ x)) (possessive (* x)))`},
 		{`[ab]?+|x{2,}+`, `(or (possessive (? [a b])) (possessive (repeat x {2,})))`},
 
 		// Escapes and escape chars.
 		{`\d\d+`, `{\d (+ \d)}`},
 		{`\..`, `{\. .}`},
+		{`\1`, `\1`},
 
 		// Short Unicode escapes.
 		{`\pL+d`, `{(+ \pL) d}`},
