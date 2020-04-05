@@ -25,6 +25,13 @@ func NewParser(opts *ParserOptions) *Parser {
 		}
 	}
 
+	p.prefixParselets[tokEscapeHexFull] = func(tok token) *Expr {
+		return p.newExprForm(OpEscapeHex, FormEscapeHexFull, tok.pos)
+	}
+	p.prefixParselets[tokEscapeUniFull] = func(tok token) *Expr {
+		return p.newExprForm(OpEscapeUni, FormEscapeUniFull, tok.pos)
+	}
+
 	p.prefixParselets[tokLparen] = func(tok token) *Expr { return p.parseGroup(OpCapture, tok) }
 	p.prefixParselets[tokLparenAtomic] = func(tok token) *Expr { return p.parseGroup(OpAtomicGroup, tok) }
 	p.prefixParselets[tokLparenPositiveLookahead] = func(tok token) *Expr { return p.parseGroup(OpPositiveLookahead, tok) }
@@ -32,7 +39,16 @@ func NewParser(opts *ParserOptions) *Parser {
 	p.prefixParselets[tokLparenPositiveLookbehind] = func(tok token) *Expr { return p.parseGroup(OpPositiveLookbehind, tok) }
 	p.prefixParselets[tokLparenNegativeLookbehind] = func(tok token) *Expr { return p.parseGroup(OpNegativeLookbehind, tok) }
 
-	p.prefixParselets[tokLparenName] = p.parseNamedCapture
+	p.prefixParselets[tokLparenName] = func(tok token) *Expr {
+		return p.parseNamedCapture(FormDefault, tok)
+	}
+	p.prefixParselets[tokLparenNameAngle] = func(tok token) *Expr {
+		return p.parseNamedCapture(FormNamedCaptureAngle, tok)
+	}
+	p.prefixParselets[tokLparenNameQuote] = func(tok token) *Expr {
+		return p.parseNamedCapture(FormNamedCaptureQuote, tok)
+	}
+
 	p.prefixParselets[tokLparenFlags] = p.parseGroupWithFlags
 
 	p.prefixParselets[tokPipe] = func(tok token) *Expr {
@@ -182,6 +198,16 @@ func (p *Parser) mergeChars(e *Expr) {
 	}
 }
 
+func (p *Parser) newEmpty(pos Position) *Expr {
+	return p.newExpr(OpConcat, pos)
+}
+
+func (p *Parser) newExprForm(op Operation, form Form, pos Position, args ...*Expr) *Expr {
+	e := p.newExpr(op, pos, args...)
+	e.Form = form
+	return e
+}
+
 func (p *Parser) newExpr(op Operation, pos Position, args ...*Expr) *Expr {
 	e := p.allocExpr()
 	*e = Expr{
@@ -193,10 +219,6 @@ func (p *Parser) newExpr(op Operation, pos Position, args ...*Expr) *Expr {
 		e.Args = append(e.Args, *arg)
 	}
 	return e
-}
-
-func (p *Parser) newEmpty(pos Position) *Expr {
-	return p.newExpr(OpConcat, pos)
 }
 
 func (p *Parser) allocExpr() *Expr {
@@ -279,7 +301,7 @@ func (p *Parser) isValidCharRangeOperand(e *Expr) bool {
 	switch e.Op {
 	case OpEscapeMeta, OpChar:
 		return true
-	case OpEscape:
+	case OpEscapeChar:
 		switch p.exprValue(e) {
 		case `\\`, `\|`, `\*`, `\+`, `\?`, `\.`, `\[`, `\^`, `\$`, `\(`, `\)`:
 			return true
@@ -338,13 +360,17 @@ func (p *Parser) parseGroup(op Operation, tok token) *Expr {
 	return result
 }
 
-func (p *Parser) parseNamedCapture(tok token) *Expr {
+func (p *Parser) parseNamedCapture(form Form, tok token) *Expr {
+	prefixLen := len("(?<")
+	if form == FormDefault {
+		prefixLen = len("(?P<")
+	}
 	name := p.newExpr(OpString, Position{
-		Begin: tok.pos.Begin + uint16(len("(?P<")),
+		Begin: tok.pos.Begin + uint16(prefixLen),
 		End:   tok.pos.End - uint16(len(">")),
 	})
 	x := p.parseGroupItem(tok)
-	result := p.newExpr(OpNamedCapture, tok.pos, x, name)
+	result := p.newExprForm(OpNamedCapture, form, tok.pos, x, name)
 	result.Pos.End = p.expect(tokRparen).End
 	return result
 }
@@ -429,19 +455,17 @@ func (p *Parser) newPCRE(source string) (*RegexpPCRE, error) {
 }
 
 var tok2op = [256]Operation{
-	tokDollar:        OpDollar,
-	tokCaret:         OpCaret,
-	tokDot:           OpDot,
-	tokChar:          OpChar,
-	tokMinus:         OpChar,
-	tokEscape:        OpEscape,
-	tokEscapeMeta:    OpEscapeMeta,
-	tokEscapeHex:     OpEscapeHex,
-	tokEscapeHexFull: OpEscapeHexFull,
-	tokEscapeOctal:   OpEscapeOctal,
-	tokEscapeUni:     OpEscapeUni,
-	tokEscapeUniFull: OpEscapeUniFull,
-	tokPosixClass:    OpPosixClass,
-	tokQ:             OpQuote,
-	tokComment:       OpComment,
+	tokDollar:      OpDollar,
+	tokCaret:       OpCaret,
+	tokDot:         OpDot,
+	tokChar:        OpChar,
+	tokMinus:       OpChar,
+	tokEscapeChar:  OpEscapeChar,
+	tokEscapeMeta:  OpEscapeMeta,
+	tokEscapeHex:   OpEscapeHex,
+	tokEscapeOctal: OpEscapeOctal,
+	tokEscapeUni:   OpEscapeUni,
+	tokPosixClass:  OpPosixClass,
+	tokQ:           OpQuote,
+	tokComment:     OpComment,
 }

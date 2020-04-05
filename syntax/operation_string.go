@@ -23,35 +23,33 @@ func _() {
 	_ = x[OpChar-12]
 	_ = x[OpString-13]
 	_ = x[OpQuote-14]
-	_ = x[OpEscape-15]
+	_ = x[OpEscapeChar-15]
 	_ = x[OpEscapeMeta-16]
 	_ = x[OpEscapeOctal-17]
 	_ = x[OpEscapeHex-18]
-	_ = x[OpEscapeHexFull-19]
-	_ = x[OpEscapeUni-20]
-	_ = x[OpEscapeUniFull-21]
-	_ = x[OpCharClass-22]
-	_ = x[OpNegCharClass-23]
-	_ = x[OpCharRange-24]
-	_ = x[OpPosixClass-25]
-	_ = x[OpRepeat-26]
-	_ = x[OpCapture-27]
-	_ = x[OpNamedCapture-28]
-	_ = x[OpGroup-29]
-	_ = x[OpGroupWithFlags-30]
-	_ = x[OpAtomicGroup-31]
-	_ = x[OpPositiveLookahead-32]
-	_ = x[OpNegativeLookahead-33]
-	_ = x[OpPositiveLookbehind-34]
-	_ = x[OpNegativeLookbehind-35]
-	_ = x[OpFlagOnlyGroup-36]
-	_ = x[OpComment-37]
-	_ = x[OpNone2-38]
+	_ = x[OpEscapeUni-19]
+	_ = x[OpCharClass-20]
+	_ = x[OpNegCharClass-21]
+	_ = x[OpCharRange-22]
+	_ = x[OpPosixClass-23]
+	_ = x[OpRepeat-24]
+	_ = x[OpCapture-25]
+	_ = x[OpNamedCapture-26]
+	_ = x[OpGroup-27]
+	_ = x[OpGroupWithFlags-28]
+	_ = x[OpAtomicGroup-29]
+	_ = x[OpPositiveLookahead-30]
+	_ = x[OpNegativeLookahead-31]
+	_ = x[OpPositiveLookbehind-32]
+	_ = x[OpNegativeLookbehind-33]
+	_ = x[OpFlagOnlyGroup-34]
+	_ = x[OpComment-35]
+	_ = x[OpNone2-36]
 }
 
-const _Operation_name = "NoneConcatDotAltStarPlusQuestionNonGreedyPossessiveCaretDollarLiteralCharStringQuoteEscapeEscapeMetaEscapeOctalEscapeHexEscapeHexFullEscapeUniEscapeUniFullCharClassNegCharClassCharRangePosixClassRepeatCaptureNamedCaptureGroupGroupWithFlagsAtomicGroupPositiveLookaheadNegativeLookaheadPositiveLookbehindNegativeLookbehindFlagOnlyGroupCommentNone2"
+const _Operation_name = "NoneConcatDotAltStarPlusQuestionNonGreedyPossessiveCaretDollarLiteralCharStringQuoteEscapeCharEscapeMetaEscapeOctalEscapeHexEscapeUniCharClassNegCharClassCharRangePosixClassRepeatCaptureNamedCaptureGroupGroupWithFlagsAtomicGroupPositiveLookaheadNegativeLookaheadPositiveLookbehindNegativeLookbehindFlagOnlyGroupCommentNone2"
 
-var _Operation_index = [...]uint16{0, 4, 10, 13, 16, 20, 24, 32, 41, 51, 56, 62, 69, 73, 79, 84, 90, 100, 111, 120, 133, 142, 155, 164, 176, 185, 195, 201, 208, 220, 225, 239, 250, 267, 284, 302, 320, 333, 340, 345}
+var _Operation_index = [...]uint16{0, 4, 10, 13, 16, 20, 24, 32, 41, 51, 56, 62, 69, 73, 79, 84, 94, 104, 115, 124, 133, 142, 154, 163, 173, 179, 186, 198, 203, 217, 228, 245, 262, 280, 298, 311, 318, 323}
 
 func (i Operation) String() string {
 	if i >= Operation(len(_Operation_index)-1) {

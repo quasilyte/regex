@@ -69,9 +69,9 @@ const (
 	// Note that closing \E is not mandatory.
 	OpQuote
 
-	// OpEscape is a single characted escape.
+	// OpEscapeChar is a single char escape.
 	// Examples: `\d` `\a` `\n`
-	OpEscape
+	OpEscapeChar
 
 	// OpEscapeMeta is an escaped meta char.
 	// Examples: `\(` `\[` `\+`
@@ -81,21 +81,15 @@ const (
 	// Examples: `\123` `\12`
 	OpEscapeOctal
 
-	// OpEscapeHex is a hex char code escape (exactly 2 digits).
+	// OpEscapeHex is a hex char code escape.
 	// Examples: `\x7F` `\xF7`
+	// FormEscapeHexFull examples: `\x{10FFFF}` `\x{F}`.
 	OpEscapeHex
 
-	// OpEscapeHexFull is a hex char code escape.
-	// Examples: `\x{10FFFF}` `\x{F}`
-	OpEscapeHexFull
-
-	// OpEscapeUni is a Unicode char class escape (one-letter name).
+	// OpEscapeUni is a Unicode char class escape.
 	// Examples: `\pS` `\pL` `\PL`
+	// FormEscapeUniFull examples: `\p{Greek}` `\p{Symbol}` `\p{^L}`
 	OpEscapeUni
-
-	// OpEscapeUniFull is a Unicode char class escape.
-	// Example: `\p{Greek}` `\p{Symbol}` `\p{^L}`
-	OpEscapeUniFull
 
 	// OpCharClass is a char class enclosed in [].
 	// Examples: `[abc]` `[a-z0-9\]]`
@@ -130,6 +124,8 @@ const (
 
 	// OpNamedCapture is `(?P<name>re)` capturing group.
 	// Examples: `(?P<foo>abc)` `(?P<name>x|y)`
+	// FormNamedCaptureAngle examples: `(?<foo>abc)` `(?<name>x|y)`
+	// FormNamedCaptureQuote examples: `(?'foo'abc)` `(?'name'x|y)`
 	// Args[0] - enclosed expression (OpConcat with 0 args for empty group)
 	// Args[1] - group name (OpString)
 	OpNamedCapture
@@ -182,4 +178,12 @@ const (
 	// OpNone2 is a sentinel value that is never part of the AST.
 	// OpNone and OpNone2 can be used to cover all ops in a range.
 	OpNone2
+)
+
+const (
+	FormDefault Form = iota
+	FormEscapeHexFull
+	FormEscapeUniFull
+	FormNamedCaptureAngle
+	FormNamedCaptureQuote
 )

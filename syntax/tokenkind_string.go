@@ -14,7 +14,7 @@ func _() {
 	_ = x[tokPosixClass-3]
 	_ = x[tokConcat-4]
 	_ = x[tokRepeat-5]
-	_ = x[tokEscape-6]
+	_ = x[tokEscapeChar-6]
 	_ = x[tokEscapeMeta-7]
 	_ = x[tokEscapeOctal-8]
 	_ = x[tokEscapeUni-9]
@@ -36,18 +36,20 @@ func _() {
 	_ = x[tokPipe-25]
 	_ = x[tokLparen-26]
 	_ = x[tokLparenName-27]
-	_ = x[tokLparenFlags-28]
-	_ = x[tokLparenAtomic-29]
-	_ = x[tokLparenPositiveLookahead-30]
-	_ = x[tokLparenPositiveLookbehind-31]
-	_ = x[tokLparenNegativeLookahead-32]
-	_ = x[tokLparenNegativeLookbehind-33]
-	_ = x[tokRparen-34]
+	_ = x[tokLparenNameAngle-28]
+	_ = x[tokLparenNameQuote-29]
+	_ = x[tokLparenFlags-30]
+	_ = x[tokLparenAtomic-31]
+	_ = x[tokLparenPositiveLookahead-32]
+	_ = x[tokLparenPositiveLookbehind-33]
+	_ = x[tokLparenNegativeLookahead-34]
+	_ = x[tokLparenNegativeLookbehind-35]
+	_ = x[tokRparen-36]
 }
 
-const _tokenKind_name = "NoneCharGroupFlagsPosixClassConcatRepeatEscapeEscapeMetaEscapeOctalEscapeUniEscapeUniFullEscapeHexEscapeHexFullComment\\Q-[[^]$^?.+*|((?P<name>(?flags(?>(?=(?<=(?!(?<!)"
+const _tokenKind_name = "NoneCharGroupFlagsPosixClassConcatRepeatEscapeCharEscapeMetaEscapeOctalEscapeUniEscapeUniFullEscapeHexEscapeHexFullComment\\Q-[[^]$^?.+*|((?P<name>(?<name>(?'name'(?flags(?>(?=(?<=(?!(?<!)"
 
-var _tokenKind_index = [...]uint8{0, 4, 8, 18, 28, 34, 40, 46, 56, 67, 76, 89, 98, 111, 118, 120, 121, 122, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 142, 149, 152, 155, 159, 162, 166, 167}
+var _tokenKind_index = [...]uint8{0, 4, 8, 18, 28, 34, 40, 50, 60, 71, 80, 93, 102, 115, 122, 124, 125, 126, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 146, 154, 162, 169, 172, 175, 179, 182, 186, 187}
 
 func (i tokenKind) String() string {
 	if i >= tokenKind(len(_tokenKind_index)-1) {

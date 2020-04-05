@@ -19,6 +19,9 @@ func TestParserErrors(t *testing.T) {
 		{`[abc`, `unterminated '['`},
 		{`\p`, `unexpected end of pattern: expected uni-class-short or '{'`},
 		{`\p{L`, `can't find closing '}'`},
+		{`(?`, `group token is incomplete`},
+		{`(?i`, `group token is incomplete`},
+		{`(?:`, `group token is incomplete`},
 	}
 
 	p := NewParser(nil)
@@ -55,8 +58,8 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 
 	switch e.Op {
 	case OpChar, OpString, OpQuote, OpPosixClass,
-		OpEscape, OpEscapeMeta, OpEscapeUni, OpEscapeUniFull,
-		OpEscapeHex, OpEscapeHexFull, OpEscapeOctal,
+		OpEscapeChar, OpEscapeMeta, OpEscapeUni,
+		OpEscapeHex, OpEscapeOctal,
 		OpDot, OpCaret, OpDollar, OpComment:
 		w.WriteString(e.Value)
 
@@ -76,7 +79,14 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 
 	case OpNamedCapture:
 		assertEndPos(e, e.Args[0].End()+1)
-		fmt.Fprintf(w, "(?P<%s>", e.Args[1].Value)
+		switch e.Form {
+		case FormNamedCaptureAngle:
+			fmt.Fprintf(w, "(?<%s>", e.Args[1].Value)
+		case FormNamedCaptureQuote:
+			fmt.Fprintf(w, "(?'%s'", e.Args[1].Value)
+		default:
+			fmt.Fprintf(w, "(?P<%s>", e.Args[1].Value)
+		}
 		writeExpr(t, w, re, e.Args[0])
 		w.WriteByte(')')
 
@@ -181,7 +191,7 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `(foobar|baz)*+(?#the comment)`, o1: OpPossessive, o2: OpComment},
 		{pat: `abc?+`, o1: OpLiteral, o2: OpPossessive},
 		{pat: `x{0}`, o1: OpChar, o2: OpString},
-		{pat: `a\x{BAD}`, o1: OpLiteral, o2: OpEscapeHexFull},
+		{pat: `a\x{BAD}`, o1: OpLiteral, o2: OpEscapeHex},
 		{pat: `(✓x✓x)`, o1: OpLiteral, o2: OpCapture},
 		{pat: `[x]`, o1: OpCharClass, o2: OpLiteral},
 		{pat: `[A-Za-z0-9-]`, o1: OpCharClass, o2: OpCharRange},
@@ -189,12 +199,12 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `x{1,2}y*`, o1: OpRepeat, o2: OpStar},
 		{pat: `x{11,30}y+`, o1: OpRepeat, o2: OpPlus},
 		{pat: `x{1,}$`, o1: OpRepeat, o2: OpDollar},
-		{pat: `\p{Cyrillic}\d`, o1: OpEscapeUniFull, o2: OpEscape},
-		{pat: `x\p{Greek}y+?`, o1: OpEscapeUniFull, o2: OpNonGreedy},
-		{pat: `x\p{L}+y`, o1: OpEscapeUniFull, o2: OpPlus},
+		{pat: `\p{Cyrillic}\d`, o1: OpEscapeUni, o2: OpEscapeChar},
+		{pat: `x\p{Greek}y+?`, o1: OpEscapeUni, o2: OpNonGreedy},
+		{pat: `x\p{L}+y`, o1: OpEscapeUni, o2: OpPlus},
 		{pat: `^\pL`, o1: OpEscapeUni, o2: OpCaret},
 		{pat: `^x\pLy`, o1: OpEscapeUni, o2: OpCaret},
-		{pat: `\d?`, o1: OpEscape, o2: OpQuestion},
+		{pat: `\d?`, o1: OpEscapeChar, o2: OpQuestion},
 		{pat: `[\xC0-\xC6]`, o1: OpCharRange, o2: OpEscapeHex},
 		{pat: `\01\xff`, o1: OpEscapeOctal, o2: OpEscapeHex},
 		{pat: `\111x\Qabc`, o1: OpEscapeOctal, o2: OpQuote},
@@ -204,7 +214,7 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `(?:fa*)`, o1: OpGroup, o2: OpStar},
 		{pat: `(?:x)|(?:y)`, o1: OpGroup, o2: OpAlt},
 		{pat: `(foo|ba?r)`, o1: OpAlt, o2: OpQuestion},
-		{pat: `(?P<1>xy\x{F})`, o1: OpNamedCapture, o2: OpEscapeHexFull},
+		{pat: `(?P<1>xy\x{F})`, o1: OpNamedCapture, o2: OpEscapeHex},
 		{pat: `(?P<x>)[^12]+?`, o1: OpNamedCapture, o2: OpNegCharClass},
 		{pat: `()\(`, o1: OpCapture, o2: OpEscapeMeta},
 		{pat: `x{1,}?.?.`, o1: OpNonGreedy, o2: OpDot},
@@ -217,7 +227,7 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `(?<=)|(<!a)`, o1: OpPositiveLookbehind, o2: OpNegativeLookbehind},
 		{pat: `\s*\{weight=(\d+)\}\s(?!\s)*`, o1: OpNegativeLookahead},
 		{pat: `(?!x)[.?,!;:@#$%^&*()]+`, o1: OpNegativeLookahead},
-		{pat: `--(?P<var_name>[\\w-]+?):\\s+?(?P<var_val>.+?);`},
+		{pat: `--(?<var_name>[\\w-]+?):\\s+?(?'var_val'.+?);`, o1: OpNamedCapture},
 		{pat: `^ *(#{1,6}) *([^\n]+?) *#* *(?:\n|$)`},
 		{pat: `^4\d{12}(\d{3})?$`},
 	}
@@ -335,7 +345,9 @@ func TestParser(t *testing.T) {
 		// Named captures.
 		{`x(?P<g>)y`, `{x (capture {} g) y}`},
 		{`x(?P<name>.)y`, `{x (capture . name) y}`},
-		{`x(?P<1>ab)y`, `{x (capture {a b} 1) y}`},
+		{`x(?P<x1>ab)y`, `{x (capture {a b} x1) y}`},
+		{`x(?<x12>ab)y`, `{x (capture {a b} x12) y}`},
+		{`x(?'x12'ab)y`, `{x (capture {a b} x12) y}`},
 
 		// Atomic groups. PCRE-only.
 		{`(?>)`, `(atomic {})`},

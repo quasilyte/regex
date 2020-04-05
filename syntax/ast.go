@@ -27,10 +27,12 @@ type Expr struct {
 	// The operations that this expression performs. See `operation.go`.
 	Op Operation
 
+	Form Form
+
+	_ [2]byte // Reserved
+
 	// Pos describes a source location inside regexp pattern.
 	Pos Position
-
-	_ [3]byte // Reserved
 
 	// Args is a list of sub-expressions of this expression.
 	//
@@ -60,6 +62,8 @@ func (e Expr) LastArg() Expr {
 
 type Operation byte
 
+type Form byte
+
 func FormatSyntax(re *Regexp) string {
 	return formatExprSyntax(re, re.Expr)
 }
@@ -75,7 +79,7 @@ func formatExprSyntax(re *Regexp, e Expr) string {
 		default:
 			return e.Value
 		}
-	case OpString, OpEscape, OpEscapeMeta, OpEscapeOctal, OpEscapeUni, OpEscapeUniFull, OpEscapeHex, OpEscapeHexFull, OpPosixClass:
+	case OpString, OpEscapeChar, OpEscapeMeta, OpEscapeOctal, OpEscapeUni, OpEscapeHex, OpPosixClass:
 		return e.Value
 	case OpRepeat:
 		return fmt.Sprintf("(repeat %s %s)", formatExprSyntax(re, e.Args[0]), e.Args[1].Value)

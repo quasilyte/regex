@@ -25,7 +25,7 @@ const (
 	tokPosixClass
 	tokConcat
 	tokRepeat
-	tokEscape
+	tokEscapeChar
 	tokEscapeMeta
 	tokEscapeOctal
 	tokEscapeUni
@@ -48,6 +48,8 @@ const (
 	tokPipe                     // |
 	tokLparen                   // (
 	tokLparenName               // (?P<name>
+	tokLparenNameAngle          // (?<name>
+	tokLparenNameQuote          // (?'name'
 	tokLparenFlags              // (?flags
 	tokLparenAtomic             // (?>
 	tokLparenPositiveLookahead  // (?=
@@ -154,12 +156,9 @@ func (l *lexer) scan() {
 				case l.byteAt(l.pos+2) == '<' && l.byteAt(l.pos+3) == '!':
 					l.pushTok(tokLparenNegativeLookbehind, len("(?<!"))
 				default:
-					if j := l.commentWidth(l.pos + 1); j >= 0 {
-						l.pushTok(tokComment, len("(")+j)
-					} else if j = l.captureNameWidth(l.pos + 1); j >= 0 {
-						l.pushTok(tokLparenName, len("(")+j)
-					} else if j = l.groupFlagsWidth(l.pos + 1); j >= 0 {
-						l.pushTok(tokLparenFlags, len("(")+j)
+					if l.tryScanComment(l.pos + 2) {
+					} else if l.tryScanGroupName(l.pos + 2) {
+					} else if l.tryScanGroupFlags(l.pos + 2) {
 					} else {
 						throwErrorf(l.pos, l.pos+1, "group token is incomplete")
 					}
@@ -270,7 +269,7 @@ func (l *lexer) scanEscape(insideCharClass bool) {
 		l.pushTok(tokQ, size)
 
 	default:
-		kind := tokEscape
+		kind := tokEscapeChar
 		if insideCharClass {
 			if charClassMetachar[l.byteAt(l.pos+1)] {
 				kind = tokEscapeMeta
@@ -303,41 +302,56 @@ func (l *lexer) Init(s string) {
 	l.pos = 0
 }
 
-func (l *lexer) captureNameWidth(pos int) int {
-	if !strings.HasPrefix(l.input[pos:], "?P<") {
-		return -1
+func (l *lexer) tryScanGroupName(pos int) bool {
+	tok := tokLparenName
+	endCh := byte('>')
+	offset := 1
+	switch l.byteAt(pos) {
+	case '\'':
+		endCh = '\''
+		tok = tokLparenNameQuote
+	case '<':
+		tok = tokLparenNameAngle
+	case 'P':
+		offset = 2
+	default:
+		return false
 	}
-	end := strings.IndexByte(l.input[pos:], '>')
-	if end >= 0 {
-		return end + len(">")
+	if pos+offset >= len(l.input) {
+		return false
 	}
-	return -1
+	end := strings.IndexByte(l.input[pos+offset:], endCh)
+	if end < 0 {
+		return false
+	}
+	l.pushTok(tok, len("(?")+offset+end+1)
+	return true
 }
 
-func (l *lexer) groupFlagsWidth(pos int) int {
-	if l.byteAt(pos) != '?' {
-		return -1
-	}
+func (l *lexer) tryScanGroupFlags(pos int) bool {
 	colonPos := strings.IndexByte(l.input[pos:], ':')
 	parenPos := strings.IndexByte(l.input[pos:], ')')
 	if parenPos < 0 {
-		return -1
+		return false
 	}
+	end := parenPos
 	if colonPos >= 0 && colonPos < parenPos {
-		return colonPos + len(":")
+		end = colonPos + len(":")
 	}
-	return parenPos
+	l.pushTok(tokLparenFlags, len("(?")+end)
+	return true
 }
 
-func (l *lexer) commentWidth(pos int) int {
-	if l.byteAt(pos) != '?' || l.byteAt(pos+1) != '#' {
-		return -1
+func (l *lexer) tryScanComment(pos int) bool {
+	if l.byteAt(pos) != '#' {
+		return false
 	}
 	parenPos := strings.IndexByte(l.input[pos:], ')')
 	if parenPos < 0 {
-		return -1
+		return false
 	}
-	return parenPos + len(`)`)
+	l.pushTok(tokComment, len("(?")+parenPos+len(")"))
+	return true
 }
 
 func (l *lexer) repeatWidth(pos int) int {
@@ -409,6 +423,8 @@ var concatTable = [256]byte{
 	tokLparen:                   concatX,
 	tokLparenFlags:              concatX,
 	tokLparenName:               concatX,
+	tokLparenNameAngle:          concatX,
+	tokLparenNameQuote:          concatX,
 	tokLparenAtomic:             concatX,
 	tokLbracket:                 concatX,
 	tokLparenPositiveLookahead:  concatX,
