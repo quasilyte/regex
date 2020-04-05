@@ -86,7 +86,7 @@ func TestLexer(t *testing.T) {
 
 		{`-`, `Char`},
 		{`[\-]`, `[ EscapeMeta ]`},
-		{`a[]a`, `Char Concat [ ] Concat Char`},
+		{`a[]a`, `Char Concat [ Char Concat Char`},
 		{`[\^a]a`, `[ EscapeChar Char ] Concat Char`},
 		{`[^a]a`, `[^ Char ] Concat Char`},
 		{`a[^abc]a`, `Char Concat [^ Char Char Char ] Concat Char`},
@@ -106,7 +106,7 @@ func TestLexer(t *testing.T) {
 		{`[$.+*^?]`, `[ Char Char Char Char Char Char ]`},
 		{`[x{1}]`, `[ Char Char Char Char ]`},
 
-		{`[^]`, `[^ ]`},
+		{`[^]`, `[^ Char`},
 		{`[^^]`, `[^ Char ]`},
 
 		{`[[:alpha:]]`, `[ PosixClass ]`},

@@ -181,6 +181,12 @@ func (l *lexer) scan() {
 
 func (l *lexer) scanCharClass() {
 	l.maybeInsertConcat()
+
+	// We need to handle first `]` in a special way. See #3.
+	if l.byteAt(l.pos) == ']' {
+		l.pushTok(tokChar, 1)
+	}
+
 	for l.pos < len(l.input) {
 		ch := l.input[l.pos]
 		if ch >= 128 {
@@ -427,6 +433,7 @@ var concatTable = [256]byte{
 	tokLparenNameQuote:          concatX,
 	tokLparenAtomic:             concatX,
 	tokLbracket:                 concatX,
+	tokLbracketCaret:            concatX,
 	tokLparenPositiveLookahead:  concatX,
 	tokLparenPositiveLookbehind: concatX,
 	tokLparenNegativeLookahead:  concatX,

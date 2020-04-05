@@ -17,6 +17,8 @@ func TestParserErrors(t *testing.T) {
 		{`\x{12`, `can't find closing '}'`},
 		{`(abc`, `expected ')', found 'None'`},
 		{`[abc`, `unterminated '['`},
+		{`[]`, `unterminated '['`},
+		{`[^]`, `unterminated '['`},
 		{`\p`, `unexpected end of pattern: expected uni-class-short or '{'`},
 		{`\p{L`, `can't find closing '}'`},
 		{`(?`, `group token is incomplete`},
@@ -193,7 +195,7 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `x{0}`, o1: OpChar, o2: OpString},
 		{pat: `a\x{BAD}`, o1: OpLiteral, o2: OpEscapeHex},
 		{pat: `(✓x✓x)`, o1: OpLiteral, o2: OpCapture},
-		{pat: `[x]`, o1: OpCharClass, o2: OpLiteral},
+		{pat: `[x][]]`, o1: OpCharClass, o2: OpLiteral},
 		{pat: `[A-Za-z0-9-]`, o1: OpCharClass, o2: OpCharRange},
 		{pat: `x{1}yz`, o1: OpLiteral, o2: OpRepeat},
 		{pat: `x{1,2}y*`, o1: OpRepeat, o2: OpStar},
@@ -215,7 +217,7 @@ func TestWriteExpr(t *testing.T) {
 		{pat: `(?:x)|(?:y)`, o1: OpGroup, o2: OpAlt},
 		{pat: `(foo|ba?r)`, o1: OpAlt, o2: OpQuestion},
 		{pat: `(?P<1>xy\x{F})`, o1: OpNamedCapture, o2: OpEscapeHex},
-		{pat: `(?P<x>)[^12]+?`, o1: OpNamedCapture, o2: OpNegCharClass},
+		{pat: `(?P<x>)[^12]+?(?:[^]]x)`, o1: OpNamedCapture, o2: OpNegCharClass},
 		{pat: `()\(`, o1: OpCapture, o2: OpEscapeMeta},
 		{pat: `x{1,}?.?.`, o1: OpNonGreedy, o2: OpDot},
 		{pat: `(?i)f.o`, o1: OpFlagOnlyGroup, o2: OpDot},
@@ -410,9 +412,7 @@ func TestParser(t *testing.T) {
 		{`\x{ABC}b`, `{\x{ABC} b}`},
 
 		// Char classes.
-		{`[]`, `[]`},
 		{`[1]`, `[1]`},
-		{`[]a`, `{[] a}`},
 		{`[1]a`, `{[1] a}`},
 		{`[-a]`, `[- a]`},
 		{`[a-]`, `[a -]`},
@@ -427,9 +427,10 @@ func TestParser(t *testing.T) {
 		{`[a+b]`, `[a + b]`},
 		{`[a*b]`, `[a * b]`},
 		{`[x{1}]`, `[x '{' 1 '}']`},
+		{`[]]`, `[]]`},
+		{`[][]`, `[] []`},
 
 		// Negated char classes.
-		{`[^]`, `[^]`},
 		{`[^1]a`, `{[^1] a}`},
 		{`[^-a]`, `[^- a]`},
 		{`[^a-]`, `[^a -]`},
@@ -439,6 +440,9 @@ func TestParser(t *testing.T) {
 		{`[^\(-\)ab]`, `[^\(-\) a b]`},
 		{`[^\]\]\d]a`, `{[^\] \] \d] a}`},
 		{`[^[\[]a`, `{[^[ \[] a}`},
+		{`[^1abc]`, `[^1 a b c]`},
+		{`[^]]`, `[^]]`},
+		{`[^][]`, `[^] []`},
 
 		// Char class ranges.
 		// We parse a-\d and it's something that should be

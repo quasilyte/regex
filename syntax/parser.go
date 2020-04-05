@@ -260,12 +260,6 @@ func (p *Parser) parsePrefixElementary(tok token) *Expr {
 }
 
 func (p *Parser) parseCharClass(op Operation, tok token) *Expr {
-	if p.lexer.Peek().kind == tokRbracket {
-		// An empty char class `[]` or `[^]`. Not valid, but we take it.
-		tok2 := p.lexer.NextToken()
-		return p.newExpr(op, combinePos(tok.pos, tok2.pos))
-	}
-
 	var endPos Position
 	p.charClass = p.charClass[:0]
 	for {
