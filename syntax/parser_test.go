@@ -94,13 +94,13 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 
 	case OpFlagOnlyGroup:
 		assertEndPos(e, e.Args[0].End()+1)
-		w.WriteByte('(')
+		w.WriteString("(?")
 		w.WriteString(e.Args[0].Value)
 		w.WriteByte(')')
 
 	case OpGroupWithFlags:
 		assertEndPos(e, e.Args[0].End()+1)
-		w.WriteByte('(')
+		w.WriteString("(?")
 		w.WriteString(e.Args[1].Value)
 		w.WriteByte(':')
 		writeExpr(t, w, re, e.Args[0])

@@ -381,7 +381,7 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 	switch {
 	case !strings.HasSuffix(val, ":"):
 		flags := p.newExpr(OpString, Position{
-			Begin: tok.pos.Begin + uint16(len("(")),
+			Begin: tok.pos.Begin + uint16(len("(?")),
 			End:   tok.pos.End,
 		})
 		result = p.newExpr(OpFlagOnlyGroup, tok.pos, flags)
@@ -390,7 +390,7 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 		result = p.newExpr(OpGroup, tok.pos, x)
 	default:
 		flags := p.newExpr(OpString, Position{
-			Begin: tok.pos.Begin + uint16(len("(")),
+			Begin: tok.pos.Begin + uint16(len("(?")),
 			End:   tok.pos.End - uint16(len(":")),
 		})
 		x := p.parseGroupItem(tok)
