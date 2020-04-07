@@ -384,6 +384,8 @@ func TestParser(t *testing.T) {
 		{`\d\d+`, `{\d (+ \d)}`},
 		{`\..`, `{\. .}`},
 		{`\1`, `\1`},
+		{`\✓b`, `{\✓ b}`},
+		{`\àb`, `{\à b}`},
 
 		// Short Unicode escapes.
 		{`\pL+d`, `{(+ \pL) d}`},
