@@ -137,7 +137,7 @@ func newParser(opts *ParserOptions) *Parser {
 		return p.newExpr(OpRepeat, combinePos(left.Pos, tok.pos), left, repeatLit)
 	}
 	p.infixParselets[tokStar] = func(left *Expr, tok token) *Expr {
-		return p.newExpr(OpStar, tok.pos, left)
+		return p.newExpr(OpStar, combinePos(left.Pos, tok.pos), left)
 	}
 	p.infixParselets[tokConcat] = func(left *Expr, tok token) *Expr {
 		right := p.parseExpr(2)
@@ -316,7 +316,7 @@ func (p *Parser) parsePlus(left *Expr, tok token) *Expr {
 	case OpPlus, OpStar, OpQuestion, OpRepeat:
 		op = OpPossessive
 	}
-	return p.newExpr(op, tok.pos, left)
+	return p.newExpr(op, combinePos(left.Pos, tok.pos), left)
 }
 
 func (p *Parser) parseQuestion(left *Expr, tok token) *Expr {
@@ -325,7 +325,7 @@ func (p *Parser) parseQuestion(left *Expr, tok token) *Expr {
 	case OpPlus, OpStar, OpQuestion, OpRepeat:
 		op = OpNonGreedy
 	}
-	return p.newExpr(op, tok.pos, left)
+	return p.newExpr(op, combinePos(left.Pos, tok.pos), left)
 }
 
 func (p *Parser) parseAlt(left *Expr, tok token) *Expr {

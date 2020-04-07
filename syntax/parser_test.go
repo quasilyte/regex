@@ -163,6 +163,7 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 		}
 
 	case OpNonGreedy, OpPossessive, OpQuestion, OpPlus, OpStar:
+		assertBeginPos(e, e.Args[0].Begin())
 		assertEndPos(e, e.Args[0].End()+1)
 		writeExpr(t, w, re, e.Args[0])
 		switch e.Op {
@@ -459,6 +460,7 @@ func TestParser(t *testing.T) {
 		{`[\x{20}-\x{7f}]`, `[\x{20}-\x{7f}]`},
 		{`[\1-\3]`, `[\1-\3]`},
 		{`[\10-\20]`, `[\10-\20]`},
+		{`[❤-❤a]`, `[❤-❤ a]`},
 
 		// Char class with meta symbols.
 		{`[|]`, `[|]`},
