@@ -12,6 +12,75 @@ type ParserOptions struct {
 }
 
 func NewParser(opts *ParserOptions) *Parser {
+	return newParser(opts)
+}
+
+type Parser struct {
+	out      Regexp
+	lexer    lexer
+	exprPool []Expr
+
+	prefixParselets [256]prefixParselet
+	infixParselets  [256]infixParselet
+
+	charClass []Expr
+	allocated uint
+
+	opts ParserOptions
+}
+
+// ParsePCRE parses PHP-style pattern with delimiters.
+// An example of such pattern is `/foo/i`.
+func (p *Parser) ParsePCRE(pattern string) (*RegexpPCRE, error) {
+	pcre, err := p.newPCRE(pattern)
+	if err != nil {
+		return nil, err
+	}
+	if pcre.HasModifier('x') {
+		return nil, errors.New("'x' modifier is not supported")
+	}
+	re, err := p.Parse(pcre.Pattern)
+	if re != nil {
+		pcre.Expr = re.Expr
+	}
+	return pcre, err
+}
+
+func (p *Parser) Parse(pattern string) (result *Regexp, err error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		if err2, ok := r.(ParseError); ok {
+			err = err2
+			return
+		}
+		panic(r)
+	}()
+
+	p.lexer.Init(pattern)
+	p.allocated = 0
+	p.out.Pattern = pattern
+	if pattern == "" {
+		p.out.Expr = *p.newExpr(OpConcat, Position{})
+	} else {
+		p.out.Expr = *p.parseExpr(0)
+	}
+
+	if !p.opts.NoLiterals {
+		p.mergeChars(&p.out.Expr)
+	}
+	p.setValues(&p.out.Expr)
+
+	return &p.out, nil
+}
+
+type prefixParselet func(token) *Expr
+
+type infixParselet func(*Expr, token) *Expr
+
+func newParser(opts *ParserOptions) *Parser {
 	var p Parser
 
 	if opts != nil {
@@ -85,69 +154,6 @@ func NewParser(opts *ParserOptions) *Parser {
 	p.infixParselets[tokQuestion] = p.parseQuestion
 
 	return &p
-}
-
-type Parser struct {
-	out      Regexp
-	lexer    lexer
-	exprPool []Expr
-
-	prefixParselets [256]prefixParselet
-	infixParselets  [256]infixParselet
-
-	charClass []Expr
-	allocated uint
-
-	opts ParserOptions
-}
-
-type prefixParselet func(token) *Expr
-
-type infixParselet func(*Expr, token) *Expr
-
-func (p *Parser) ParsePCRE(pattern string) (*RegexpPCRE, error) {
-	pcre, err := p.newPCRE(pattern)
-	if err != nil {
-		return nil, err
-	}
-	if pcre.HasModifier('x') {
-		return nil, errors.New("'x' modifier is not supported")
-	}
-	re, err := p.Parse(pcre.Pattern)
-	if re != nil {
-		pcre.Expr = re.Expr
-	}
-	return pcre, err
-}
-
-func (p *Parser) Parse(pattern string) (result *Regexp, err error) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			return
-		}
-		if err2, ok := r.(ParseError); ok {
-			err = err2
-			return
-		}
-		panic(r)
-	}()
-
-	p.lexer.Init(pattern)
-	p.allocated = 0
-	p.out.Pattern = pattern
-	if pattern == "" {
-		p.out.Expr = *p.newExpr(OpConcat, Position{})
-	} else {
-		p.out.Expr = *p.parseExpr(0)
-	}
-
-	if !p.opts.NoLiterals {
-		p.mergeChars(&p.out.Expr)
-	}
-	p.setValues(&p.out.Expr)
-
-	return &p.out, nil
 }
 
 func (p *Parser) setValues(e *Expr) {

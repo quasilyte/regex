@@ -1,0 +1,50 @@
+goos: linux
+goarch: amd64
+pkg: github.com/quasilyte/regex/syntax
+BenchmarkParserPratt/lit-8         	  613467	      1936 ns/op
+BenchmarkParserPratt/lit-8         	  621439	      1919 ns/op
+BenchmarkParserPratt/lit-8         	  606087	      1953 ns/op
+BenchmarkParserPratt/lit-8         	  625696	      1908 ns/op
+BenchmarkParserPratt/lit-8         	  633720	      1956 ns/op
+BenchmarkParserPratt/alt-8         	 1701543	       707 ns/op
+BenchmarkParserPratt/alt-8         	 1686858	       726 ns/op
+BenchmarkParserPratt/alt-8         	 1636288	       730 ns/op
+BenchmarkParserPratt/alt-8         	 1650235	       739 ns/op
+BenchmarkParserPratt/alt-8         	 1648258	       726 ns/op
+BenchmarkParserPratt/esc-8         	 1390712	       865 ns/op
+BenchmarkParserPratt/esc-8         	 1393341	       846 ns/op
+BenchmarkParserPratt/esc-8         	 1392960	       858 ns/op
+BenchmarkParserPratt/esc-8         	 1397808	       861 ns/op
+BenchmarkParserPratt/esc-8         	 1378027	       861 ns/op
+BenchmarkParserPratt/charclass-8   	  480506	      2383 ns/op
+BenchmarkParserPratt/charclass-8   	  498946	      2396 ns/op
+BenchmarkParserPratt/charclass-8   	  446740	      2465 ns/op
+BenchmarkParserPratt/charclass-8   	  473500	      2439 ns/op
+BenchmarkParserPratt/charclass-8   	  484746	      2395 ns/op
+BenchmarkParserPratt/posix-8       	 1830765	       646 ns/op
+BenchmarkParserPratt/posix-8       	 1831190	       651 ns/op
+BenchmarkParserPratt/posix-8       	 1813386	       644 ns/op
+BenchmarkParserPratt/posix-8       	 1875648	       653 ns/op
+BenchmarkParserPratt/posix-8       	 1851716	       649 ns/op
+BenchmarkParserPratt/meta-8        	  956252	      1219 ns/op
+BenchmarkParserPratt/meta-8        	  891967	      1244 ns/op
+BenchmarkParserPratt/meta-8        	  883104	      1219 ns/op
+BenchmarkParserPratt/meta-8        	  914023	      1226 ns/op
+BenchmarkParserPratt/meta-8        	  914232	      1237 ns/op
+BenchmarkParserPratt/repeat-8      	 1319295	       906 ns/op
+BenchmarkParserPratt/repeat-8      	 1350019	       887 ns/op
+BenchmarkParserPratt/repeat-8      	 1361724	       882 ns/op
+BenchmarkParserPratt/repeat-8      	 1358223	       897 ns/op
+BenchmarkParserPratt/repeat-8      	 1346122	       888 ns/op
+BenchmarkParserPratt/group-8       	  952732	      1276 ns/op
+BenchmarkParserPratt/group-8       	  900776	      1277 ns/op
+BenchmarkParserPratt/group-8       	  887779	      1229 ns/op
+BenchmarkParserPratt/group-8       	  989283	      1224 ns/op
+BenchmarkParserPratt/group-8       	  935227	      1224 ns/op
+BenchmarkParserPratt/quote-8       	11067195	       106 ns/op
+BenchmarkParserPratt/quote-8       	11245544	       107 ns/op
+BenchmarkParserPratt/quote-8       	11093673	       106 ns/op
+BenchmarkParserPratt/quote-8       	11181278	       106 ns/op
+BenchmarkParserPratt/quote-8       	10688074	       109 ns/op
+PASS
+ok  	github.com/quasilyte/regex/syntax	71.708s
