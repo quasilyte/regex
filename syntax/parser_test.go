@@ -326,13 +326,14 @@ func TestParser(t *testing.T) {
 		{`(x)|(y)`, `(or (capture x) (capture y))`},
 		{`(x)(y)`, `{(capture x) (capture y)}`},
 		{`✓(x)y`, `{✓ (capture x) y}`},
-		{`a(x1|y1)b`, `{a (capture (or {x 1} {y 1})) b}`},
+		{`a(x1|y1)b`, `{a (capture (or x1 y1)) b}`},
 
 		// Non-capturing groups without flags.
 		{`x(?:)y`, `{x (group {}) y}`},
 		{`x(?:.)y`, `{x (group .) y}`},
-		{`x(?:ab)y`, `{x (group {a b}) y}`},
+		{`x(?:ab)y`, `{x (group ab) y}`},
 		{`(?:a|b)`, `(group (or a b))`},
+		{`(?:^a|bc)c`, `{(group (or {^ a} bc)) c}`},
 
 		// Flag-only groups.
 		{`x(?i)y`, `{x (flags ?i) y}`},
@@ -342,14 +343,14 @@ func TestParser(t *testing.T) {
 		// Non-capturing groups with flags.
 		{`x(?i:)y`, `{x (group {} ?i) y}`},
 		{`x(?im:.)y`, `{x (group . ?im) y}`},
-		{`x(?i-m:ab)y`, `{x (group {a b} ?i-m) y}`},
+		{`x(?i-m:ab)y`, `{x (group ab ?i-m) y}`},
 
 		// Named captures.
 		{`x(?P<g>)y`, `{x (capture {} g) y}`},
 		{`x(?P<name>.)y`, `{x (capture . name) y}`},
-		{`x(?P<x1>ab)y`, `{x (capture {a b} x1) y}`},
-		{`x(?<x12>ab)y`, `{x (capture {a b} x12) y}`},
-		{`x(?'x12'ab)y`, `{x (capture {a b} x12) y}`},
+		{`x(?P<x1>ab)y`, `{x (capture ab x1) y}`},
+		{`x(?<x12>ab)y`, `{x (capture ab x12) y}`},
+		{`x(?'x12'ab)y`, `{x (capture ab x12) y}`},
 
 		// Atomic groups. PCRE-only.
 		{`(?>)`, `(atomic {})`},
@@ -454,6 +455,10 @@ func TestParser(t *testing.T) {
 		{`[--+]`, `[--+]`},
 		{`[---]`, `[---]`},
 		{`[-]`, `[-]`},
+		{`[\x20-\x7f]`, `[\x20-\x7f]`},
+		{`[\x{20}-\x{7f}]`, `[\x{20}-\x{7f}]`},
+		{`[\1-\3]`, `[\1-\3]`},
+		{`[\10-\20]`, `[\10-\20]`},
 
 		// Char class with meta symbols.
 		{`[|]`, `[|]`},
@@ -499,7 +504,7 @@ func TestParser(t *testing.T) {
 
 		// Tests from the patterns found in various GitHub projects.
 		{`Adm([^i]|$)`, `{Adm (capture (or [^i] $))}`},
-		{`\.(com|com\.\w{2})$`, `{\. (capture (or {c o m} {c o m \. (repeat \w {2})})) $}`},
+		{`\.(com|com\.\w{2})$`, `{\. (capture (or com {com \. (repeat \w {2})})) $}`},
 		{`(?i)a(?:x|y)b`, `{(flags ?i) a (group (or x y)) b}`},
 	}
 

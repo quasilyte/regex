@@ -168,10 +168,10 @@ func (p *Parser) exprValue(e *Expr) string {
 }
 
 func (p *Parser) mergeChars(e *Expr) {
+	for i := range e.Args {
+		p.mergeChars(&e.Args[i])
+	}
 	if e.Op != OpConcat || len(e.Args) < 2 {
-		for i := range e.Args {
-			p.mergeChars(&e.Args[i])
-		}
 		return
 	}
 
@@ -299,7 +299,7 @@ func (p *Parser) parseMinus(left *Expr, tok token) *Expr {
 
 func (p *Parser) isValidCharRangeOperand(e *Expr) bool {
 	switch e.Op {
-	case OpEscapeMeta, OpChar:
+	case OpEscapeHex, OpEscapeOctal, OpEscapeMeta, OpChar:
 		return true
 	case OpEscapeChar:
 		switch p.exprValue(e) {
