@@ -447,6 +447,7 @@ func TestParser(t *testing.T) {
 		{`[^1abc]`, `[^1 a b c]`},
 		{`[^]]`, `[^]]`},
 		{`[^][]`, `[^] []`},
+		{`[^\040\041\043-\133\135-\176]`, `[^\040 \041 \043-\133 \135-\176]`},
 
 		// Char class ranges.
 		// We parse a-\d and it's something that should be
