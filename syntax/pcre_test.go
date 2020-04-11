@@ -5,6 +5,32 @@ import (
 	"testing"
 )
 
+func TestParserErrorsPCRE(t *testing.T) {
+	tests := []struct {
+		pattern string
+		want    string
+	}{
+		{``, `empty pattern: can't find delimiters`},
+		{`aba`, `'a' is not a valid delimiter`},
+		{` aa `, `whitespace is not a valid delimiter`},
+		{`/abc`, `can't find '/' ending delimiter`},
+		{`#abc`, `can't find '#' ending delimiter`},
+	}
+
+	p := NewParser(nil)
+	for _, test := range tests {
+		_, err := p.ParsePCRE(test.pattern)
+		have := "<nil>"
+		if err != nil {
+			have = err.Error()
+		}
+		if have != test.want {
+			t.Errorf("parse(%q):\nhave: %s\nwant: %s",
+				test.pattern, have, test.want)
+		}
+	}
+}
+
 func TestParsePCRE(t *testing.T) {
 	tests := []struct {
 		source string
