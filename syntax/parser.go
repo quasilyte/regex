@@ -2,7 +2,6 @@ package syntax
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -239,7 +238,7 @@ func (p *Parser) allocExpr() *Expr {
 func (p *Parser) expect(kind tokenKind) Position {
 	tok := p.lexer.NextToken()
 	if tok.kind != kind {
-		throwErrorf(int(tok.pos.Begin), int(tok.pos.End), "expected '%s', found '%s'", kind, tok.kind)
+		throwExpectedFound(tok.pos, kind.String(), tok.kind.String())
 	}
 	return tok.pos
 }
@@ -248,7 +247,7 @@ func (p *Parser) parseExpr(precedence int) *Expr {
 	tok := p.lexer.NextToken()
 	prefix := p.prefixParselets[tok.kind]
 	if prefix == nil {
-		throwfPos(tok.pos, "unexpected token: %v", tok)
+		throwUnexpectedToken(tok.pos, tok.String())
 	}
 	left := prefix(tok)
 
@@ -277,7 +276,7 @@ func (p *Parser) parseCharClass(op Operation, tok token) *Expr {
 			break
 		}
 		if next.kind == tokNone {
-			throwfPos(tok.pos, "unterminated '['")
+			throw(tok.pos, "unterminated '['")
 		}
 	}
 
@@ -436,14 +435,14 @@ func (p *Parser) newPCRE(source string) (*RegexpPCRE, error) {
 			return nil, errors.New("whitespace is not a valid delimiter")
 		}
 		if isAlphanumeric(delim) {
-			return nil, fmt.Errorf("'%c' is not a valid delimiter", delim)
+			return nil, errors.New("'" + string(delim) + "' is not a valid delimiter")
 		}
 	}
 
 	const delimLen = 1
 	j := strings.LastIndexByte(source[delimLen:], endDelim)
 	if j == -1 {
-		return nil, fmt.Errorf("can't find '%c' ending delimiter", endDelim)
+		return nil, errors.New("can't find '" + string(endDelim) + "' ending delimiter")
 	}
 	j += delimLen
 
