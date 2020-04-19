@@ -59,11 +59,49 @@ func writeExpr(t *testing.T, w *strings.Builder, re *Regexp, e Expr) {
 	}
 
 	switch e.Op {
-	case OpChar, OpString, OpQuote, OpPosixClass,
-		OpEscapeChar, OpEscapeMeta, OpEscapeUni,
-		OpEscapeHex, OpEscapeOctal,
-		OpDot, OpCaret, OpDollar, OpComment:
+	case OpChar, OpString, OpPosixClass, OpDot, OpCaret, OpDollar, OpComment:
 		w.WriteString(e.Value)
+
+	case OpQuote:
+		assertBeginPos(e, e.Args[0].Begin()-uint16(len(`\Q`)))
+		w.WriteString(`\Q`)
+		writeExpr(t, w, re, e.Args[0])
+		if e.Form != FormQuoteUnclosed {
+			w.WriteString(`\E`)
+		}
+
+	case OpEscapeOctal, OpEscapeChar, OpEscapeMeta:
+		assertBeginPos(e, e.Args[0].Begin()-uint16(len(`\`)))
+		w.WriteString(`\`)
+		writeExpr(t, w, re, e.Args[0])
+
+	case OpEscapeUni:
+		switch e.Form {
+		case FormEscapeUniFull:
+			assertBeginPos(e, e.Args[0].Begin()-uint16(len(`\p{`)))
+			assertEndPos(e, e.Args[0].End()+uint16(len(`}`)))
+			w.WriteString(`\p{`)
+			writeExpr(t, w, re, e.Args[0])
+			w.WriteString(`}`)
+		default:
+			assertBeginPos(e, e.Args[0].Begin()-uint16(len(`\p`)))
+			w.WriteString(`\p`)
+			writeExpr(t, w, re, e.Args[0])
+		}
+
+	case OpEscapeHex:
+		switch e.Form {
+		case FormEscapeHexFull:
+			assertBeginPos(e, e.Args[0].Begin()-uint16(len(`\x{`)))
+			assertEndPos(e, e.Args[0].End()+uint16(len(`}`)))
+			w.WriteString(`\x{`)
+			writeExpr(t, w, re, e.Args[0])
+			w.WriteString(`}`)
+		default:
+			assertBeginPos(e, e.Args[0].Begin()-uint16(len(`\x`)))
+			w.WriteString(`\x`)
+			writeExpr(t, w, re, e.Args[0])
+		}
 
 	case OpLiteral:
 		assertBeginPos(e, e.Args[0].Begin())

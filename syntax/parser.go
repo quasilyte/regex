@@ -93,12 +93,38 @@ func newParser(opts *ParserOptions) *Parser {
 		}
 	}
 
+	p.prefixParselets[tokQ] = func(tok token) *Expr {
+		litPos := tok.pos
+		litPos.Begin += uint16(len(`\Q`))
+		form := FormQuoteUnclosed
+		if strings.HasSuffix(p.tokenValue(tok), `\E`) {
+			litPos.End -= uint16(len(`\E`))
+			form = FormDefault
+		}
+		lit := p.newExpr(OpString, litPos)
+		return p.newExprForm(OpQuote, form, tok.pos, lit)
+	}
+
 	p.prefixParselets[tokEscapeHexFull] = func(tok token) *Expr {
-		return p.newExprForm(OpEscapeHex, FormEscapeHexFull, tok.pos)
+		litPos := tok.pos
+		litPos.Begin += uint16(len(`\x{`))
+		litPos.End -= uint16(len(`}`))
+		lit := p.newExpr(OpString, litPos)
+		return p.newExprForm(OpEscapeHex, FormEscapeHexFull, tok.pos, lit)
 	}
 	p.prefixParselets[tokEscapeUniFull] = func(tok token) *Expr {
-		return p.newExprForm(OpEscapeUni, FormEscapeUniFull, tok.pos)
+		litPos := tok.pos
+		litPos.Begin += uint16(len(`\p{`))
+		litPos.End -= uint16(len(`}`))
+		lit := p.newExpr(OpString, litPos)
+		return p.newExprForm(OpEscapeUni, FormEscapeUniFull, tok.pos, lit)
 	}
+
+	p.prefixParselets[tokEscapeHex] = func(tok token) *Expr { return p.parseEscape(OpEscapeHex, `\x`, tok) }
+	p.prefixParselets[tokEscapeOctal] = func(tok token) *Expr { return p.parseEscape(OpEscapeOctal, `\`, tok) }
+	p.prefixParselets[tokEscapeChar] = func(tok token) *Expr { return p.parseEscape(OpEscapeChar, `\`, tok) }
+	p.prefixParselets[tokEscapeMeta] = func(tok token) *Expr { return p.parseEscape(OpEscapeMeta, `\`, tok) }
+	p.prefixParselets[tokEscapeUni] = func(tok token) *Expr { return p.parseEscape(OpEscapeUni, `\p`, tok) }
 
 	p.prefixParselets[tokLparen] = func(tok token) *Expr { return p.parseGroup(OpCapture, tok) }
 	p.prefixParselets[tokLparenAtomic] = func(tok token) *Expr { return p.parseGroup(OpAtomicGroup, tok) }
@@ -160,6 +186,10 @@ func (p *Parser) setValues(e *Expr) {
 		p.setValues(&e.Args[i])
 	}
 	e.Value = p.exprValue(e)
+}
+
+func (p *Parser) tokenValue(tok token) string {
+	return p.out.Pattern[tok.pos.Begin:tok.pos.End]
 }
 
 func (p *Parser) exprValue(e *Expr) string {
@@ -399,6 +429,13 @@ func (p *Parser) parseGroupWithFlags(tok token) *Expr {
 	return result
 }
 
+func (p *Parser) parseEscape(op Operation, prefix string, tok token) *Expr {
+	litPos := tok.pos
+	litPos.Begin += uint16(len(prefix))
+	lit := p.newExpr(OpString, litPos)
+	return p.newExpr(op, tok.pos, lit)
+}
+
 func (p *Parser) precedenceOf(tok token) int {
 	switch tok.kind {
 	case tokPipe:
@@ -456,17 +493,11 @@ func (p *Parser) newPCRE(source string) (*RegexpPCRE, error) {
 }
 
 var tok2op = [256]Operation{
-	tokDollar:      OpDollar,
-	tokCaret:       OpCaret,
-	tokDot:         OpDot,
-	tokChar:        OpChar,
-	tokMinus:       OpChar,
-	tokEscapeChar:  OpEscapeChar,
-	tokEscapeMeta:  OpEscapeMeta,
-	tokEscapeHex:   OpEscapeHex,
-	tokEscapeOctal: OpEscapeOctal,
-	tokEscapeUni:   OpEscapeUni,
-	tokPosixClass:  OpPosixClass,
-	tokQ:           OpQuote,
-	tokComment:     OpComment,
+	tokDollar:     OpDollar,
+	tokCaret:      OpCaret,
+	tokDot:        OpDot,
+	tokChar:       OpChar,
+	tokMinus:      OpChar,
+	tokPosixClass: OpPosixClass,
+	tokComment:    OpComment,
 }
