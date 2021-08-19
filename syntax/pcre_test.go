@@ -44,6 +44,7 @@ func TestParsePCRE(t *testing.T) {
 		{`#hello#`, "hello", "##", ""},
 		{`{pcre pattern}smi`, "pcre pattern", "{}", "smi"},
 		{`<an[o]ther (example)!>ms`, "an[o]ther (example)!", "<>", "ms"},
+		{`/clipFrom/([0-9]+)`, "clipFrom", "//", "([0-9]+)"},
 	}
 
 	p := NewParser(nil)
